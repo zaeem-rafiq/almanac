@@ -47,12 +47,30 @@ CORPUS_DIR = REPO_ROOT / "corpus" / "channel"
 
 YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.force-ssl"]
 
-# Quota unit costs, from YouTube's published Data API v3 quota table. These are NOT in the
-# discovery document — it carries no cost metadata — so they are documented values, while the
-# CALL COUNTS the ledger records are observed. The proof reports both halves separately so
+# Quota unit costs, per endpoint, from YouTube's published Data API v3 quota table
+# (developers.google.com/youtube/v3/determine_quota_cost, read 2026-09-07). These are NOT in
+# the discovery document — it carries no cost metadata — so they are documented values, while
+# the CALL COUNTS the ledger records are observed. The proof reports both halves separately so
 # nobody mistakes one for the other.
-COST_LIST = 1
-COST_CAPTION_DOWNLOAD = 200
+#
+# CORRECTION: an earlier version of this ledger priced every `.list` call at 1 unit. That is
+# wrong and it understated the scan. **`captions.list` costs 50**, not 1 — the captions
+# resource is expensive across the board. The mistake mattered: it put the reported cost of a
+# full scan at 1008 units when the real figure is 1253. Cheap `.list` is an assumption about
+# a family of endpoints, and this table exists so no endpoint inherits another's price.
+#
+# `captions.download` is absent from the published table; 200 is the figure HAC-42 states, and
+# it is carried here on the issue's authority rather than as an independent observation.
+QUOTA_COSTS = {
+    "channels.list": 1,
+    "playlistItems.list": 1,
+    "videos.list": 1,
+    "videos.insert": 1,       # plus a separate 100-uploads-per-day allocation
+    "captions.list": 50,
+    "captions.download": 200,
+    "captions.insert": 400,
+}
+DEFAULT_COST = 1
 
 # tfmt candidates for gap G-2, best first. "srt" is what the issue wants; the rest exist so a
 # 400 produces a recorded working value instead of a guess.
@@ -77,19 +95,20 @@ class QuotaLedger:
     def record(self, endpoint: str, count: int = 1) -> None:
         self.calls[endpoint] = self.calls.get(endpoint, 0) + count
 
+    @staticmethod
+    def cost(endpoint: str) -> int:
+        """Unit cost of one call. Unknown endpoints fall back to 1 and are NOT silently free."""
+        return QUOTA_COSTS.get(endpoint, DEFAULT_COST)
+
     @property
     def units(self) -> int:
-        total = 0
-        for endpoint, count in self.calls.items():
-            unit = COST_CAPTION_DOWNLOAD if endpoint == "captions.download" else COST_LIST
-            total += unit * count
-        return total
+        return sum(self.cost(endpoint) * count for endpoint, count in self.calls.items())
 
     def breakdown(self) -> list[str]:
         rows = []
         for endpoint in sorted(self.calls):
             count = self.calls[endpoint]
-            unit = COST_CAPTION_DOWNLOAD if endpoint == "captions.download" else COST_LIST
+            unit = self.cost(endpoint)
             rows.append(f"{endpoint:<22} {count:>3} x {unit:>4} = {count * unit:>5}")
         rows.append(f"{'TOTAL':<22} {'':>3}   {'':>4}   {self.units:>5}")
         return rows

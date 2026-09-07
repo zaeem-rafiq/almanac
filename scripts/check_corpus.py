@@ -44,6 +44,17 @@ MIN_HARD_NEGATIVES = 6
 REQUIRED_STATUSES = {"correct", "stale_material", "stale_immaterial", "skip", "unresolved"}
 REQUIRED_META_FIELDS = ("video_id", "title", "published_at", "description")
 
+# Only the fields a HUMAN wrote are scanned for real-world references. `video_id` is an opaque
+# 11-character token assigned by YouTube and `published_at` is a timestamp; neither is prose and
+# neither can carry a creator's name. Scanning them produced a false positive the moment A-06
+# replaced the hand-written placeholders with real ids: `3dil-DquuG0` tripped the proper-noun
+# detector on the fragment "DquuG".
+#
+# This narrows WHERE the detector looks, never WHAT it catches. A real name, cashtag, handle or
+# brand URL still has to appear in a title, a description or a caption file to be in the corpus
+# at all, and all of those are still scanned — as the control fixture continues to prove.
+AUTHORED_META_FIELDS = ("title", "description")
+
 # Generic finance / calendar / grammar vocabulary. Every entry is a common noun, a month, a
 # statutory term or a first-person pronoun — deliberately NOT a brand, product or person.
 ALLOWED_PROPER_NOUNS = {
@@ -266,7 +277,7 @@ def prove_no_real_world_refs() -> tuple[bool, str, list[str]]:
         text = path.read_text()
         if path.suffix == ".json":
             meta = json.loads(text)
-            text = "\n".join(str(meta.get(f, "")) for f in REQUIRED_META_FIELDS)
+            text = "\n".join(str(meta.get(f, "")) for f in AUTHORED_META_FIELDS)
         scanned += 1
         if findings := scan_for_real_world_refs(text):
             ok = False

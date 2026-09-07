@@ -125,15 +125,31 @@ def fake_uploads(channel_dir, ids=None):
 
 # --------------------------------------------------------------------------- quota ledger
 
-def test_ledger_prices_the_documented_full_scan_at_1008_units():
+def test_ledger_prices_the_documented_full_scan_at_1253_units():
     ledger = yt.QuotaLedger()
     ledger.record("channels.list")
     ledger.record("playlistItems.list")
     ledger.record("videos.list")
     ledger.record("captions.list", 5)
     ledger.record("captions.download", 5)
-    assert ledger.units == 1 + 1 + 1 + 5 + 5 * 200 == 1008
+    assert ledger.units == 1 + 1 + 1 + 5 * 50 + 5 * 200 == 1253
     assert cy.prove_quota(ledger)[0]
+
+
+def test_captions_list_is_not_priced_like_a_cheap_list():
+    """The captions resource is expensive; an earlier ledger charged 1 and understated a scan.
+
+    Pinned explicitly because the bug was invisible — everything still "passed", just against
+    a number that was 245 units too low.
+    """
+    assert yt.QuotaLedger.cost("captions.list") == 50
+    assert yt.QuotaLedger.cost("videos.list") == 1
+    assert yt.QuotaLedger.cost("captions.download") == 200
+    assert yt.QuotaLedger.cost("captions.insert") == 400
+
+
+def test_an_unpriced_endpoint_is_never_silently_free():
+    assert yt.QuotaLedger.cost("some.future.method") == yt.DEFAULT_COST >= 1
 
 
 def test_quota_proof_fails_once_the_budget_is_exceeded():
@@ -207,7 +223,21 @@ def test_ids_match_fails_on_an_upload_no_corpus_folder_claims(sandbox):
 
 
 def test_ids_match_fails_while_meta_json_still_holds_a_placeholder(sandbox):
-    videos = fake_uploads(sandbox)  # deliberately NOT writing the ids back
+    """A placeholder id must never satisfy the proof.
+
+    The corpus now carries real ids, so the placeholder is planted explicitly rather than
+    relying on the corpus still being unseeded — otherwise this test would quietly stop
+    testing anything the moment the channel was seeded.
+    """
+    videos = fake_uploads(sandbox)
+    yt.write_video_ids(yt.match_videos_to_corpus(videos, sandbox), sandbox)
+
+    slug = sorted(p.name for p in sandbox.iterdir() if p.is_dir())[0]
+    path = sandbox / slug / "meta.json"
+    meta = json.loads(path.read_text())
+    meta["video_id"] = "placeholder-v1-401k-limits"
+    path.write_text(json.dumps(meta, indent=2) + "\n")
+
     ok, detail = cy.prove_ids_match(videos)
     assert not ok
     assert "is not a real id" in detail
@@ -475,7 +505,7 @@ def test_the_live_proof_runner_passes_end_to_end_offline(sandbox, tmp_path, monk
     assert written.count("= PASS") == 3
     assert "= DEFERRED" in written
     # The quota line is arithmetic, so it must reproduce exactly.
-    assert "1008" in written
+    assert "1253" in written
 
 
 def test_the_runner_refuses_to_write_a_proof_from_a_partial_channel(sandbox, monkeypatch, tmp_path):
