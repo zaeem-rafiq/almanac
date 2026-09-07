@@ -8,6 +8,8 @@ RECORDS how it was called, because the failure this guards against is not an exc
 from __future__ import annotations
 
 import sys
+
+import almanac
 import types
 from unittest.mock import patch
 
@@ -40,6 +42,11 @@ def stub_youtube(monkeypatch, tmp_path):
     module.read_youtube_sources = read_youtube_sources
     module.iter_sources = iter_sources
     monkeypatch.setitem(sys.modules, "almanac.youtube", module)
+    # `from almanac.youtube import ...` resolves the ATTRIBUTE on the package, not the
+    # sys.modules entry, once the real module has been imported by another test module.
+    # Without this second patch the stub silently never installs and these tests assert
+    # against the real youtube.py — they pass alone and fail after tests/test_youtube.py.
+    monkeypatch.setattr(almanac, "youtube", module, raising=False)
     return module, calls
 
 
