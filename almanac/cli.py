@@ -243,14 +243,27 @@ def _cmd_scan(args) -> int:
         except ImportError as exc:  # pragma: no cover - depends on A-06 landing
             print(f"--source youtube needs almanac/youtube.py (A-06): {exc}")
             return 2
-        fetch = getattr(youtube, "fetch_sources", None) or getattr(youtube, "iter_sources", None)
-        if fetch is None:
+        # A-06 (branch claude/competent-galileo-832037) exposes `read_youtube_sources()` and
+        # `iter_sources(origin=...)`, both returning A-03's `extract.Source`.
+        #
+        # `iter_sources` DEFAULTS TO origin="corpus". Calling it bare here would scan the local
+        # corpus while this command reported YouTube — and would make A-06's proof 3 ("youtube
+        # status counts == corpus status counts") pass by comparing the corpus against itself.
+        # So the origin is always passed explicitly, and the preferred entry point is the one
+        # that cannot be pointed anywhere else.
+        if hasattr(youtube, "read_youtube_sources"):
+            sources = list(youtube.read_youtube_sources())
+        elif hasattr(youtube, "iter_sources"):
+            sources = list(youtube.iter_sources(origin="youtube"))
+        elif hasattr(youtube, "fetch_sources"):
+            sources = list(youtube.fetch_sources())
+        else:
             print(
-                "--source youtube needs almanac/youtube.py to expose fetch_sources() returning "
-                "extract.Source objects; A-06 owns that module and it has not landed on main yet."
+                "--source youtube needs almanac/youtube.py to expose read_youtube_sources() or "
+                "iter_sources(origin='youtube') returning extract.Source objects; A-06 owns that "
+                "module and it has not landed on main yet."
             )
             return 2
-        sources = list(fetch())
 
     judged, notes = _judged(sources, draft_notes=not args.no_notes)
     report = build_report(args.source, judged, notes)
