@@ -77,10 +77,27 @@ MEASURED = {
     "judge_status_disagreements": "0 across five live runs, all five statuses",
     "extraction_reproducible": False,
     "extraction_variance": "65-77 verdicts on identical input; the eval gate fails 2 runs in 5",
+    # Corrected 2026-09-07 against ADR-000 §10. The earlier text here named `temperature` as the
+    # cause and called the D-5 fix "not applied". BOTH halves were false: this model accepts no
+    # sampling control at all (the SDK has no `temperature` parameter; `temperature`, `top_p` and
+    # `top_k` return HTTP 400 "deprecated for this model", `seed` is rejected as an extra input),
+    # and a fix HAS landed - the coverage sweep in `d314e9a`, which re-reads any number-bearing
+    # sentence the first pass produced no claim for.
     "known_defect": (
-        "extract.py calls messages.create without temperature, so it samples at the API default "
-        "1.0 and sometimes drops a stale_material claim. Fix proposed in ADR-002 D-5; NOT "
-        "applied - it changes A-03's module and needs Zaeem's decision."
+        "This model exposes no sampling control - temperature, top_p, top_k and seed are all "
+        "rejected by the API (ADR-000 §10) - so determinism cannot be requested and has to be "
+        "enforced in code. A coverage sweep (d314e9a) now re-reads any number-bearing sentence "
+        "the first pass produced no claim for."
+    ),
+    # The honesty rule turned on this page itself. Every figure above was measured by A-05 on the
+    # extractor as it stood BEFORE the sweep landed, and this session could not re-measure: the
+    # Anthropic credit balance is exhausted, so `almanac scan` returns HTTP 400. Whether the sweep
+    # moves these numbers is UNMEASURED here, and the page says so rather than implying otherwise.
+    "figures_predate_the_sweep": True,
+    "sweep_measured_here": False,
+    "unmeasured": (
+        "The figures above were measured before the d314e9a coverage sweep landed, and the scan "
+        "below is also a pre-sweep run. This page has not measured what the sweep changed."
     ),
 }
 

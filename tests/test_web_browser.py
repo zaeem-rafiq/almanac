@@ -127,7 +127,9 @@ def test_page_renders_with_zero_console_errors(browser, base_url: str, label: st
 
     # The honesty copy must survive any redesign.
     assert "not reproducible" in body
-    assert "has not been applied" in body
+    assert "no sampling control" in body
+    assert "has not measured that sweep" in body
+    assert "has not been applied" not in body  # the retracted temperature claim
 
     # No horizontal overflow at either width — "mobile-readable at 390px" is a measurement.
     overflow = page.evaluate(

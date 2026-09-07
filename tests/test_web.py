@@ -141,12 +141,27 @@ def test_page_quotes_only_measured_figures(client: TestClient) -> None:
     assert measured["extraction_reproducible"] is False
     assert measured["extraction_recall"] == "89% (48/54)"
     assert measured["stale_material_recall"] == "1.00"
-    assert "not\napplied" in measured["known_defect"].replace(" ", "\n") or \
-        "NOT applied" in measured["known_defect"]
+
+    # ADR-000 §10: this model accepts no sampling control, so `temperature` is not the cause and
+    # never could have been the fix. The page must name the real constraint.
+    assert "no sampling control" in measured["known_defect"]
+    assert "ADR-000" in measured["known_defect"]
+
+    # The figures predate the d314e9a coverage sweep and this session could not re-measure
+    # (the API credit balance is exhausted). The page must carry that limit, not hide it.
+    assert measured["figures_predate_the_sweep"] is True
+    assert measured["sweep_measured_here"] is False
 
     page = client.get("/").text
     assert "not reproducible" in page
-    assert "has not been applied" in page
+    assert "no sampling control" in page
+    assert "has not measured that sweep" in page
+
+    # Regression guard on the retracted claim. It was false twice over — the fix cannot be
+    # applied, and a different one already landed — and it sat in the panel the page's
+    # credibility rests on, so it must not come back.
+    assert "has not been applied" not in page
+    assert "API default of 1.0" not in page
 
 
 # ---------------------------------------------------------------------------------- /api/lint

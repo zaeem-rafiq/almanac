@@ -209,13 +209,18 @@ button:disabled{opacity:.45;cursor:default}
       <dl class="measured" id="measured"></dl>
       <div class="caveat">
         <h3>And what it is not</h3>
-        <p><strong>Extraction is not reproducible.</strong> The same input yields 65&ndash;77 verdicts
-          run to run, and the eval gate fails 2 runs in 5 &mdash; extraction sometimes drops one
-          <span class="mono">stale_material</span> claim.</p>
-        <p>Cause: <span class="mono">extract.py</span> calls the model without a
-          <span class="mono">temperature</span>, so it samples at the API default of 1.0. A fix is
-          proposed in ADR-002 D-5 and <strong>has not been applied</strong> &mdash; it changes a
-          shipped module and is Zaeem&rsquo;s call.</p>
+        <p><strong>Extraction is not reproducible.</strong> Claim counts vary run to run: A-05
+          measured 65&ndash;77 verdicts on identical input, and its eval gate failed 2 runs in 5
+          when extraction dropped a <span class="mono">stale_material</span> claim.</p>
+        <p>Cause: this model exposes <strong>no sampling control at all</strong> &mdash;
+          <span class="mono">temperature</span>, <span class="mono">top_p</span>,
+          <span class="mono">top_k</span> and <span class="mono">seed</span> are all rejected by
+          the API (ADR-000 &sect;10). Determinism cannot be requested, so it has to be enforced in
+          code: a coverage sweep re-reads any number-bearing sentence the first pass produced no
+          claim for.</p>
+        <p><strong>This page has not measured that sweep.</strong> The figures beside this were
+          measured on the extractor as it stood <em>before</em> the sweep landed, and the scan
+          below is a pre-sweep run too. Whether the sweep moves them is unmeasured here.</p>
         <p>So this page does not claim every number gets caught. It claims that what the judge
           ruled, it ruled from a rule you can read.</p>
       </div>
@@ -418,8 +423,10 @@ button:disabled{opacity:.45;cursor:default}
       dl.appendChild(el("dt", null, r[0]));
       dl.appendChild(el("dd", null, r[1]));
     });
-    $("attrib").textContent = "Every figure above was measured by " + m.source +
+    var attrib = "Every figure above was measured by " + m.source +
       ". Nothing on this page quotes a number that run did not produce.";
+    if (m.figures_predate_the_sweep) { attrib += " " + m.unmeasured; }
+    $("attrib").textContent = attrib;
   }
 
   function renderTally(counts) {
