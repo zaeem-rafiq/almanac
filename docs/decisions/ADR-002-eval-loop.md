@@ -295,3 +295,63 @@ are not directly comparable: `cli.CORPUS_CHANNEL` scopes `scan --source corpus` 
 those 5 **plus** `corpus/scripts/fresh_ok.md` and `fresh_wrong.md`. The labels split 40 / 14 across
 those trees. So "64 verdicts vs 54 labelled rows" compares a 5-video scan against a 7-source label
 set; the like-for-like figure is 64 verdicts against the 40 channel labels.
+
+---
+
+## D-5 CORRECTION — the recommended fix does not exist on this model
+
+**Status:** D-5's recommendation is WITHDRAWN. The finding stands; the proposed fix was wrong.
+This file is append-only, so nothing above is deleted — read it with this in front of it.
+
+Zaeem ruled "pin `temperature=0.0` in extract.py". It cannot be done, and D-5 should not have
+proposed it without checking the installed SDK first — the Project Rules require verifying every
+library call against the installed package before using it, and that check was skipped.
+
+**Verified against `anthropic 1.4.0` as installed, then against the live API:**
+
+| check | result |
+|---|---|
+| `temperature` in `messages.create` signature | **absent** (21 params, none is `temperature`) |
+| `temperature` anywhere in `anthropic/types/` | **absent** |
+| `top_p` / `top_k` | **absent** |
+| `output_config` fields | `effort`, `format` only — no sampling controls |
+| live call with `extra_body={"temperature": 0.0}` | **HTTP 400** — ``` `temperature` is deprecated for this model ``` (`claude-opus-5`) |
+
+Sampling controls were removed from the Messages API for this model. There is no knob to pin.
+
+### `output_config.effort` was tested as the nearest available lever, and does not fix it
+
+`effort` *is* accepted for `claude-opus-5`. Measured by monkeypatch — `extract.py` was not
+modified — 6 live gate runs at `effort="high"` against the standing baseline:
+
+| | baseline | `effort="high"` |
+|---|---|---|
+| gate PASS | 7 / 11 runs | 5 / 6 runs |
+| verdict spread | 65–79 (14) | 67–80 (13) |
+| mean verdicts | 74.5 | 75.5 |
+| runs dropping line 35 | every failure | every failure |
+
+5/6 against 4/6 on the matched sub-sample is inside the noise at this n, the spread is unchanged,
+and it still drops line 35. **`effort` is not the fix and is not recommended on this evidence.**
+
+### What 17 live runs actually establish
+
+* **`judge.py` has produced ZERO status disagreements in all 17 runs.** That result is now very
+  well supported.
+* The gate fails roughly a third of the time, and **every single failure is the same sentence** —
+  line 35, the live i-bond composite rate, which sits immediately beside line 36's historical
+  sentence about the *same entity*.
+
+That specificity is the point. This is not diffuse sampling noise that a temperature knob would
+have flattened; it is one sentence being intermittently merged into its neighbour. It is the same
+failure family as **D-2**, where the extractor emits one claim covering two labelled rows.
+
+### Revised recommendation — a targeted prompt change, NOT applied
+
+Instruct the extractor to emit one claim per number, and specifically not to collapse a
+present-tense value into an adjacent historical sentence about the same entity. That is a
+`extract.py` prompt change, which the issue does put in scope ("you fix the prompt or the rule").
+
+**It is not applied here.** The last confident recommendation in this ADR was wrong because it
+was not verified first; this one changes extraction semantics, would interact with D-2 and D-3,
+and needs Zaeem's call plus a re-measured 6-run gate before it is believed.
