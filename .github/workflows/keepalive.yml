@@ -1,9 +1,44 @@
-# A-11: keeps the OAuth refresh token warm. Stub — manual trigger only.
+# A-09: keeps the serverless host warm through the judging window so a cold start never eats
+# the first request. Scoped to one day on purpose — this is not a permanent cron.
 name: keepalive
+
 on:
+  schedule:
+    # Every 10 minutes, 12:00-22:00 UTC on 8 September. The judging window is 09:00-17:00 ET,
+    # which is 13:00-21:00 UTC in EDT; an hour of margin sits on each side.
+    - cron: "*/10 12-22 8 9 *"
   workflow_dispatch:
+
 jobs:
-  noop:
+  ping:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "A-11 fills this in."
+      - name: Curl the live report endpoint
+        env:
+          ALMANAC_URL: ${{ vars.ALMANAC_URL }}
+        run: |
+          set -euo pipefail
+          # Fail loudly rather than curling an empty URL and reporting a misleading green.
+          if [ -z "${ALMANAC_URL:-}" ]; then
+            echo "::error::repo variable ALMANAC_URL is not set — run: gh variable set ALMANAC_URL"
+            exit 1
+          fi
+          TARGET="${ALMANAC_URL%/}/api/report"
+          echo "GET ${TARGET}"
+          CODE="$(curl --silent --show-error --location --max-time 60 \
+                       --output /tmp/keepalive-body --write-out '%{http_code}' "${TARGET}")"
+          echo "HTTP ${CODE}"
+          head -c 400 /tmp/keepalive-body || true
+          echo
+          # Assert the size of what came back, not merely that a request happened: a 200 with an
+          # empty body is a warm host serving nothing.
+          BYTES="$(wc -c < /tmp/keepalive-body | tr -d ' ')"
+          echo "body bytes: ${BYTES}"
+          if [ "${CODE}" != "200" ]; then
+            echo "::error::expected HTTP 200, got ${CODE}"
+            exit 1
+          fi
+          if [ "${BYTES}" -lt 2 ]; then
+            echo "::error::HTTP 200 but body is ${BYTES} bytes — host is up but serving nothing"
+            exit 1
+          fi
