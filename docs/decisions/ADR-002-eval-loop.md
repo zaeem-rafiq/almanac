@@ -355,3 +355,24 @@ present-tense value into an adjacent historical sentence about the same entity. 
 **It is not applied here.** The last confident recommendation in this ADR was wrong because it
 was not verified first; this one changes extraction semantics, would interact with D-2 and D-3,
 and needs Zaeem's call plus a re-measured 6-run gate before it is believed.
+
+### The boundary of that claim, tested rather than generalised
+
+The 400 says "deprecated for **this model**", which is scoped. Tested per model, same SDK, same
+key, live calls:
+
+| model | `extra_body={"temperature": 0.0}` |
+|---|---|
+| `claude-opus-5` (what `extract.py` defaults to) | **REJECTED** — deprecated for this model |
+| `claude-sonnet-5` | **REJECTED** — deprecated for this model |
+| `claude-haiku-4-5-20251001` | **ACCEPTED** |
+
+So the accurate statement is not "temperature is gone" but "temperature is unavailable on the
+Claude 5 family, and Almanac runs on `claude-opus-5`". `extract._client()` reads
+`os.environ.get("LLM_MODEL", "claude-opus-5")`, so the knob *could* be regained by pinning
+`LLM_MODEL=claude-haiku-4-5-20251001`.
+
+**That is not recommended.** It trades the extraction model down a tier to buy a determinism knob,
+on a task whose failure mode is a semantic merge of two adjacent sentences — there is no evidence
+a weaker model merges them less often, and good reason to expect the opposite. Recorded so the
+option is visible and its cost is stated, not so it is taken.
