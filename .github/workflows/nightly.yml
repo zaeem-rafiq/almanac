@@ -1,0 +1,9 @@
+# A-10: nightly rates refresh + report. Stub — manual trigger only so nothing fires early.
+name: nightly
+on:
+  workflow_dispatch:
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "A-10 fills this in."

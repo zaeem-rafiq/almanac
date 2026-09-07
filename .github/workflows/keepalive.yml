@@ -1,0 +1,9 @@
+# A-11: keeps the OAuth refresh token warm. Stub — manual trigger only.
+name: keepalive
+on:
+  workflow_dispatch:
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "A-11 fills this in."

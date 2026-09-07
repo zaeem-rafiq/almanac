@@ -1,0 +1,127 @@
+# ADR-000 — Stack, verified call signatures, and gaps
+
+- Status: Accepted
+- Date: 2026-09-07
+- Issue: A-00 (HAC-36), step 2 "self-discover before scaffolding"
+- Rule invoked: *"Verify every library call against the installed package docs before using it."* and
+  *"Do not guess an API — an unverified call is listed as a gap, not used."*
+
+## 1. Toolchain
+
+| Component | Version | How verified |
+|---|---|---|
+| CPython | 3.12.12 | `uv venv --python 3.12` → `Using CPython 3.12.12` |
+| venv | `venv/` at repo root | created by `uv venv` (uv 0.11.23) |
+| git | 2.50.1 (Apple Git-155) | `git --version` |
+| gh | 2.96.0, authed as `zaeem-rafiq` | `gh auth status` |
+
+## 2. Installed package versions
+
+Resolved by `uv pip install` into `venv/`, read back with `importlib.metadata.version`:
+
+anthropic==1.4.0
+google-api-python-client==2.200.0
+google-auth-oauthlib==1.4.1
+google-auth==2.57.1
+requests==2.34.2
+pydantic==2.13.5
+pyyaml==6.0.3
+srt==3.5.3
+fastapi==0.141.1
+uvicorn==0.52.4
+pytest==9.1.1
+
+## 3. YouTube Data API v3 — signatures verified offline
+
+`google-api-python-client` ships the discovery document, so every signature below was read from
+the installed package rather than from the web — no network, no API key, no guessing.
+
+- Source read: `venv/lib/python3.12/site-packages/googleapiclient/discovery_cache/documents/youtube.v3.json`
+- Discovery revision: **20260820**, API version **v3**
+
+| Call | httpMethod / path | Required | Verified notes |
+|---|---|---|---|
+| `captions().list(part=, videoId=)` | GET `youtube/v3/captions` | `part`, `videoId` | `part` is repeated (list or comma string); returns `CaptionListResponse` |
+| `captions().download(id=, tfmt=)` | GET `youtube/v3/captions/{id}` | `id` | `supportsMediaDownload: True` → `.execute()` returns **bytes**, not dict. `tfmt` optional |
+| `videos().list(part=, id=)` | GET `youtube/v3/videos` | `part` | `id` repeated; `maxResults` integer |
+| `videos().update(part=, body=)` | **PUT** `youtube/v3/videos` | `part` | request body schema `Video`, response `Video` |
+| `channels().list(part=, mine=True)` | GET `youtube/v3/channels` | `part` | `mine` is a real boolean parameter — confirmed present |
+| `playlistItems().list(part=, playlistId=)` | GET `youtube/v3/playlistItems` | `part` | `playlistId` / `videoId` / `pageToken` optional |
+
+OAuth scope `https://www.googleapis.com/auth/youtube.force-ssl` is confirmed present in the
+discovery document's `auth.oauth2.scopes` list.
+
+### 3a. Consequence for the write guard (A-07)
+
+`videos.update` is a **PUT**, and `VideoSnippet` carries
+`categoryId, channelId, channelTitle, defaultAudioLanguage, defaultLanguage, description,
+liveBroadcastContent, localized, publishedAt, tags, thumbnails, title`.
+A PUT with a partial snippet drops the omitted fields. Therefore write-back must
+**read the snippet with `videos().list(part="snippet")` first, mutate only `description`, and
+send the whole snippet back** with the video `id`. This is a design constraint, not a preference.
+
+## 4. Anthropic SDK — tool use with a Pydantic-derived schema
+
+Verified by introspecting the installed SDK (`inspect.signature`), not from memory:
+
+- `client.messages.create(...)` accepts: `model, max_tokens, messages, system, tools, tool_choice,
+  stop_sequences, temperature*, stream, thinking, ...` (`tools: Iterable[ToolUnionParam]`,
+  `tool_choice: ToolChoiceParam`).
+- `anthropic.types.ToolParam.__annotations__` keys include **`name`, `description`, `input_schema`**
+  (plus `cache_control, strict, type, input_examples, ...`). So a tool is
+  `{"name": ..., "description": ..., "input_schema": <JSON Schema>}`.
+- `anthropic.types.ToolUseBlock` exists → the structured result is read off content blocks of
+  `type == "tool_use"`.
+- Pydantic → JSON Schema is `Model.model_json_schema()`. Confirmed by generating one: a nested
+  model emits **`$defs` + `$ref`**, e.g. `{"properties": {"claims": {"items": {"$ref":
+  "#/$defs/Claim"}, "type": "array"}}, "$defs": {"Claim": {...}}, "required": ["claims"]}`.
+
+This is the intended shape for `extract.py` and `notes.py` — the only two modules permitted to
+call a model.
+
+## 5. FMP — endpoint and field shapes confirmed against live data
+
+Confirmed the endpoint vocabulary and response shape against FMP's live service. Every name in the
+issue is real and every one returns ≥1 row:
+
+| Call | Rows | Response shape |
+|---|---|---|
+| `economics-indicators?name=federalFunds` | ≥3 | `{"name","date","value"}`, monthly |
+| `economics-indicators?name=30YearFixedRateMortgageAverage` | ≥13 | `{"name","date","value"}`, weekly |
+| `economics-indicators?name=CPI` | ≥2 | `{"name","date","value"}`, monthly |
+| `treasury-rates` | ≥64 | `{"date","month1"…"year10"…"year30"}`, **daily**, `year10` present |
+
+`treasury-rates` takes no `name` parameter; the maturity is a **field**, so `year10` is read off the
+newest row. `economics-indicators` requires `name`. Both accept `from_date` / `to_date`.
+
+### 5a. Finding — `CPI` is an index level, not an inflation rate
+
+`CPI` returns `326.031` (an index), not `~3.0` (a percent). A creator's claim
+"inflation is 3%" therefore **cannot be compared to a single CPI row**. Almanac must compute
+year-over-year from two CPI observations 12 months apart, and `facts/rates.json` should store the
+derived YoY percent alongside the raw index, with `fetched_via` recording the derivation. This
+changes the `rates` key set and belongs in the A-01 catalog design.
+
+### 5b. Finding — three of the four series lag; treasury does not
+
+Observed newest dates: `treasury-rates` **2026-09-04** (current), but `federalFunds`
+**2025-12-01**, `CPI` **2025-12-01**, `30YearFixedRateMortgageAverage` **2025-12-04** — roughly
+nine months stale relative to today. If that lag is also present on the REST endpoint used by
+`catalog.refresh_rates()`, a naive `max_age_days` check marks Almanac's own rates table stale on
+day one and the demo self-destructs. See Gap G-1.
+
+## 6. Gaps — verified as unknown, therefore not used
+
+| # | Gap | Resolution step |
+|---|---|---|
+| G-1 | Whether the **REST** `economics-indicators` endpoint with `FMP_API_KEY` returns fresher rows than the ~9-month lag observed. Also the exact base URL/version for the account's plan. | `scripts/preflight.py` prints the newest `date` per series; if the lag persists, `max_age_days` must be set per series from observed cadence rather than assumed. |
+| G-2 | `tfmt="srt"` is typed `string` with **no enum** in the discovery document, so the accepted value set is not verifiable offline. | Assert it live in A-06 against the test channel; fall back to another `tfmt` only if it 400s. |
+| G-3 | Whether Anthropic's `input_schema` accepts Pydantic's `$defs`/`$ref` form or needs flattening. | Preflight's live Anthropic call is a **tool-use** call with a `$defs`-bearing schema, so A-00 proves it before A-03 depends on it. |
+| G-4 | OAuth not yet performed — no `client_secret.json` present at the time of writing. Auth date to be appended here on first successful consent. | A-00 execution. Refresh tokens for an app in "Testing" expire after **7 days**; deadline is Tue Sep 8, so one consent covers the event. |
+| G-5 | No `python-dotenv` in the approved package list, so `.env` is parsed by a small hand-rolled reader in `almanac/` rather than a new dependency. | Recorded here as a deliberate choice; no dependency added without Zaeem's approval. |
+
+## 7. OAuth authorisation log
+
+| Date authorised | Channel id | Scope | Notes |
+|---|---|---|---|
+| _pending A-00 execution_ | — | `.../auth/youtube.force-ssl` | 7-day refresh-token expiry for Testing-mode apps |
