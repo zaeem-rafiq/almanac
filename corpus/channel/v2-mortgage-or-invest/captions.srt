@@ -1,0 +1,224 @@
+1
+00:00:00,000 --> 00:00:02,800
+Pay off the mortgage or invest the money. This is
+
+2
+00:00:03,000 --> 00:00:05,800
+the single most argued about question I get, and most
+
+3
+00:00:06,000 --> 00:00:08,800
+of the answers you have heard are missing the part
+
+4
+00:00:09,000 --> 00:00:11,800
+that actually decides it. Let us set the table. Say
+
+5
+00:00:12,000 --> 00:00:14,800
+you have three hundred thousand dollars left on the loan,
+
+6
+00:00:15,000 --> 00:00:17,800
+your payment is about one thousand two hundred dollars a
+
+7
+00:00:18,000 --> 00:00:20,800
+month before taxes and insurance, and you have found an
+
+8
+00:00:21,000 --> 00:00:23,800
+extra five hundred dollars a month you could throw at
+
+9
+00:00:24,000 --> 00:00:26,800
+either side. The rate on the loan is the whole
+
+10
+00:00:27,000 --> 00:00:29,800
+argument. Right now the thirty year fixed average is six
+
+11
+00:00:30,000 --> 00:00:32,800
+point eight five percent. That is your guaranteed return for
+
+12
+00:00:33,000 --> 00:00:35,800
+paying the loan down early. Guaranteed is the word doing
+
+13
+00:00:36,000 --> 00:00:38,800
+the work there. On the other side, say you assume
+
+14
+00:00:39,000 --> 00:00:41,800
+seven percent from a broad market index fund. I want
+
+15
+00:00:42,000 --> 00:00:44,800
+to be careful here, because that is an assumption I
+
+16
+00:00:45,000 --> 00:00:47,800
+am making for the math, not a promise anybody made
+
+17
+00:00:48,000 --> 00:00:50,800
+to you. The market does not owe you seven percent
+
+18
+00:00:51,000 --> 00:00:53,800
+in any particular decade. So on paper it is close
+
+19
+00:00:54,000 --> 00:00:56,800
+to a coin flip, and that is exactly why the
+
+20
+00:00:57,000 --> 00:00:59,800
+spreadsheet is the wrong tool for this decision. Here is
+
+21
+00:01:00,000 --> 00:01:02,800
+what the spreadsheet leaves out. Paying the mortgage down is
+
+22
+00:01:03,000 --> 00:01:05,800
+a guaranteed return with no sequence risk. Investing is an
+
+23
+00:01:06,000 --> 00:01:08,800
+expected return with a very wide distribution. Those two things
+
+24
+00:01:09,000 --> 00:01:11,800
+are not the same kind of number, and comparing them
+
+25
+00:01:12,000 --> 00:01:14,800
+directly is the mistake almost everybody makes. The second thing
+
+26
+00:01:15,000 --> 00:01:17,800
+it leaves out is liquidity. Money you put into the
+
+27
+00:01:18,000 --> 00:01:20,800
+house is gone until you sell or borrow against it.
+
+28
+00:01:21,000 --> 00:01:23,800
+Money in a brokerage account is there the week your
+
+29
+00:01:24,000 --> 00:01:26,800
+roof fails. And the third thing is the emotional return,
+
+30
+00:01:27,000 --> 00:01:29,800
+which is not a real financial term and is absolutely
+
+31
+00:01:30,000 --> 00:01:32,800
+a real thing. Some people sleep better with no mortgage.
+
+32
+00:01:33,000 --> 00:01:35,800
+That is worth something, and you are allowed to buy
+
+33
+00:01:36,000 --> 00:01:38,800
+it. So here is the order I would actually use.
+
+34
+00:01:39,000 --> 00:01:41,800
+First, get the full employer match. That is not a
+
+35
+00:01:42,000 --> 00:01:44,800
+rate comparison, that is free money, and it wins against
+
+36
+00:01:45,000 --> 00:01:47,800
+everything. Second, build a cash buffer you would not feel
+
+37
+00:01:48,000 --> 00:01:50,800
+embarrassed about. Whatever number makes you willing to leave the
+
+38
+00:01:51,000 --> 00:01:53,800
+extra five hundred dollars invested during a bad year, that
+
+39
+00:01:54,000 --> 00:01:56,800
+is the right number for you. Third, then compare the
+
+40
+00:01:57,000 --> 00:01:59,800
+rate. If your loan rate is meaningfully above what you
+
+41
+00:02:00,000 --> 00:02:02,800
+expect from the market, the loan is a fine place
+
+42
+00:02:03,000 --> 00:02:05,800
+for the extra five hundred. If it is well below,
+
+43
+00:02:06,000 --> 00:02:08,800
+invest and stop thinking about it. And a practical note.
+
+44
+00:02:09,000 --> 00:02:11,800
+If you do put extra at the mortgage, tell your
+
+45
+00:02:12,000 --> 00:02:14,800
+servicer to apply it to principal. Otherwise a lot of
+
+46
+00:02:15,000 --> 00:02:17,800
+them just park it against next month's payment and you
+
+47
+00:02:18,000 --> 00:02:20,800
+get nothing out of it. Fifteen years of extra payments
+
+48
+00:02:21,000 --> 00:02:23,800
+applied to the wrong bucket is a real thing that
+
+49
+00:02:24,000 --> 00:02:26,800
+happens to real people. What I would not do is
+
+50
+00:02:27,000 --> 00:02:29,800
+agonize. Both of these are good outcomes. You are choosing
+
+51
+00:02:30,000 --> 00:02:32,800
+between guaranteed and probably better, and there is no version
+
+52
+00:02:33,000 --> 00:02:35,800
+of this where you end up worse off than the
+
+53
+00:02:36,000 --> 00:02:38,800
+person who spent the money. Usual disclaimer, I am not
+
+54
+00:02:39,000 --> 00:02:41,800
+a financial advisor and this is not financial advice. If
+
+55
+00:02:42,000 --> 00:02:44,800
+this was useful, let me know which side you landed
+
+56
+00:02:45,000 --> 00:02:47,800
+on. See you next time.
+
