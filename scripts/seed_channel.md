@@ -133,11 +133,13 @@ The composite rate, the twelve month lockup, and why the rate everybody remember
 Tell me, and I will run:
 
 ```bash
-venv/bin/python -m almanac youtube --list
+venv/bin/python scripts/check_youtube.py
 ```
 
-which reads the channel back over owner OAuth and writes the real `video_id` into each
-`corpus/channel/*/meta.json`. That is the only field in `corpus/` this issue touches.
+which reads the channel back over owner OAuth, writes the real `video_id` into each
+`corpus/channel/*/meta.json` (the only field in `corpus/` this issue touches), and prints the
+A-06 proof lines. `venv/bin/python -m almanac youtube --list` shows the same listing without
+writing anything.
 
 **Captions lag.** A track uploaded through Studio often takes a few minutes to show up in
 `captions.list`, and occasionally longer while the video finishes processing. The proof
