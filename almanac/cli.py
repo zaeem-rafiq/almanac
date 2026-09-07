@@ -135,6 +135,38 @@ def _cmd_extract(args) -> int:
     return 0
 
 
+def _cmd_judge(args) -> int:
+    """`judge <path>` — extract, then decide. Every row shows the rule that decided it.
+
+    The RULE column is the point: a verdict nobody can trace to a rule is a bug, not a default.
+    """
+    from almanac.extract import discover_sources, extract_sources
+    from almanac.judge import judge_all
+
+    sources = discover_sources(args.target)
+    by_source = extract_sources(sources)
+
+    counts: dict[str, int] = {}
+    for source in sources:
+        verdicts = judge_all(by_source[source.source_id])
+        shown = [v for v in verdicts if args.all or v.status != "skip"]
+        print(f"\n{source.source_id}  —  {len(verdicts)} claim(s), {len(shown)} shown")
+        print(f"{'LOCATOR':<14} {'STATUS':<17} {'RULE':<34} {'CLAIMED':>11} {'CURRENT':>11}  DETAIL")
+        print("-" * 160)
+        for verdict in shown:
+            counts[verdict.status] = counts.get(verdict.status, 0) + 1
+            claimed = "—" if verdict.claim.value is None else f"{verdict.claim.value:,.2f}"
+            expected = "—" if verdict.expected is None else f"{verdict.expected:,.2f}"
+            print(f"{verdict.claim.locator:<14} {verdict.status:<17} {verdict.rule_fired:<34} "
+                  f"{claimed:>11} {expected:>11}  {verdict.detail[:60]}")
+        for verdict in verdicts:
+            if verdict.status == "skip" and not args.all:
+                counts["skip"] = counts.get("skip", 0) + 1
+    print("-" * 160)
+    print(" · ".join(f"{status}={n}" for status, n in sorted(counts.items())))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
@@ -151,6 +183,11 @@ def main(argv: list[str] | None = None) -> int:
     extract = sub.add_parser("extract", help="label the numeric claims in a script or caption file")
     extract.add_argument("target", help="a .srt/.md file, a video directory, or a tree of them")
     extract.set_defaults(func=_cmd_extract)
+
+    judge_cmd = sub.add_parser("judge", help="extract then decide, showing the rule behind each verdict")
+    judge_cmd.add_argument("target", help="a .srt/.md file, a video directory, or a tree of them")
+    judge_cmd.add_argument("--all", action="store_true", help="include skipped claims")
+    judge_cmd.set_defaults(func=_cmd_judge)
 
     args = parser.parse_args(argv)
     return args.func(args)

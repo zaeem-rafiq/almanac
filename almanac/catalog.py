@@ -23,7 +23,7 @@ from pathlib import Path
 import requests
 import yaml
 
-from almanac.models import CatalogEntry, Fact, RateRow
+from almanac.models import CatalogEntry, Fact, HistoryEntry, RateRow
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = REPO_ROOT / "facts" / "catalog.yaml"
@@ -111,6 +111,45 @@ def current(key: str, today: date | None = None) -> Fact:
         resolved_from="rates", source_url=row.primary_source_url or entry.source_url,
         stale=stale, max_age_days=entry.max_age_days, age_days=age,
     )
+
+
+def windows_for(key: str, year: int) -> list[HistoryEntry]:
+    """Every catalog window for `key` that overlaps `year`, current entry included.
+
+    A key can hold more than one window in a year — an I-bond composite rate resets each May and
+    November — so this returns a LIST. "In 2022 it paid 9.62%" is a true statement if any 2022
+    window paid 9.62%, and picking one window arbitrarily would turn a true sentence into a
+    disputed one on a coin flip.
+
+    An empty list means the catalog carries no window covering that year. That is missing
+    evidence, and judge.py must treat it as such — never as a contradiction.
+    """
+    catalog = load_catalog()
+    if key not in catalog:
+        raise KeyError(f"unknown catalog key: {key!r}")
+    entry = catalog[key]
+
+    candidates = list(entry.history)
+    candidates.append(
+        HistoryEntry(
+            value=entry.value,
+            effective_from=entry.effective_from,
+            effective_to=entry.effective_to,
+            source_url=entry.source_url,
+        )
+    )
+
+    covering = []
+    for window in candidates:
+        start, end = window.effective_from, window.effective_to
+        if start is None and end is None:
+            continue
+        if start is not None and start.year > year:
+            continue
+        if end is not None and end.year < year:
+            continue
+        covering.append(window)
+    return covering
 
 
 def freshness_report(today: date | None = None) -> list[dict]:
