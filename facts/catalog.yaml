@@ -30,6 +30,10 @@ entities:
         effective_from: 2025-01-01
         effective_to: 2025-12-31
         source_url: https://www.irs.gov/retirement-plans/cola-increases-for-dollar-limitations-on-benefits-and-contributions
+      - value: 23000.0
+        effective_from: 2024-01-01
+        effective_to: 2024-12-31
+        source_url: https://www.irs.gov/retirement-plans/cola-increases-for-dollar-limitations-on-benefits-and-contributions
 
   - key: k401_catchup_50plus
     label: 401(k) catch-up contribution, age 50+
@@ -179,6 +183,10 @@ entities:
       - value: 3.98
         effective_from: 2025-05-01
         effective_to: 2025-10-31
+        source_url: https://www.treasurydirect.gov/files/savings-bonds/i-bond-rate-chart.pdf
+      - value: 3.11
+        effective_from: 2024-11-01
+        effective_to: 2025-04-30
         source_url: https://www.treasurydirect.gov/files/savings-bonds/i-bond-rate-chart.pdf
 
   # ============ source: rates (written by `rates --refresh` — do not hand-edit) ============
