@@ -65,7 +65,15 @@ QUOTA_COSTS = {
     "channels.list": 1,
     "playlistItems.list": 1,
     "videos.list": 1,
-    "videos.insert": 1,       # plus a separate 100-uploads-per-day allocation
+    # 1600, NOT 1. A WebFetch summary of the published table reported "videos.insert: 1 quota
+    # per call, 100 calls per day" and that number was written into ADR-000. It is wrong, and
+    # the correction came from the API itself: after 5 uploads and 4 proof scans the project
+    # 403'd with quotaExceeded. At 1 unit the day's spend is ~7,000 and nothing should have
+    # failed; at 1600 it is ~15,000, which is the only figure consistent with what happened.
+    # The "100 per day" in the docs is a separate rate limit on uploads, not the unit price.
+    # Lesson: a small model's paraphrase of a table is not a verified value — the two reads
+    # that "agreed" agreed because they were the same summariser making the same mistake.
+    "videos.insert": 1600,
     "captions.list": 50,
     "captions.download": 200,
     "captions.insert": 400,
