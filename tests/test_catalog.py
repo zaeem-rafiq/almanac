@@ -186,25 +186,69 @@ def test_no_module_but_catalog_calls_the_rate_feeds():
 
 # --------------------------------------------------------------------------- live URL checks
 
-@pytest.mark.network
-def test_every_source_url_returns_200():
-    """PROOF A-01 #2. Covers manual source_urls and every rates primary_source_url."""
-    urls = {}
+def source_urls_to_check() -> dict[str, list[str]]:
+    """Every source_url in the catalog, grouped by URL and labelled by where it came from.
+
+    Grouped by URL rather than keyed by entry. The earlier version keyed this dict by
+    f"{entry.key}[history]", which collapsed *all* of a key's history rows onto one slot, so
+    only the last row's URL was ever fetched. Once k401_employee_deferral and
+    ibond_composite_rate each gained a second history row, that silently skipped two URLs --
+    the two most recently added ones, which are exactly the ones a url-200 test exists to
+    catch. Labels carry the row index so a second row can never hide behind the first.
+    """
+    urls: dict[str, list[str]] = {}
     for entry in load_catalog().values():
         if entry.source_url:
-            urls[entry.key] = entry.source_url
-        for h in entry.history:
+            urls.setdefault(entry.source_url, []).append(entry.key)
+        for i, h in enumerate(entry.history):
             if h.source_url:
-                urls[f"{entry.key}[history]"] = h.source_url
+                urls.setdefault(h.source_url, []).append(f"{entry.key}[history][{i}]")
+    return urls
+
+
+def test_url_check_covers_every_history_row():
+    """Regression for the collapsed-key bug above -- the PRESENT branch, not the absent one.
+
+    A-01 shipped a wrong verdict because `effective_to` was only exercised when absent. The
+    same shape applies here: a catalog where every key has at most one history row cannot
+    distinguish the broken collection from the fixed one, so this test asserts against a key
+    that actually has two.
+    """
+    catalog_entries = load_catalog().values()
+    expected = sum(
+        (1 if e.source_url else 0) + sum(1 for h in e.history if h.source_url)
+        for e in catalog_entries
+    )
+    labels = [label for group in source_urls_to_check().values() for label in group]
+    assert len(labels) == len(set(labels)), f"duplicate labels: {labels}"
+    assert len(labels) == expected, (
+        f"collected {len(labels)} sources but the catalog carries {expected}; "
+        "a source_url is escaping the url-200 check"
+    )
+
+    multi_row = [e for e in catalog_entries if sum(1 for h in e.history if h.source_url) > 1]
+    assert multi_row, (
+        "no key has more than one sourced history row, so this regression cannot fail; "
+        "the test is only meaningful while such a key exists"
+    )
+    for entry in multi_row:
+        for i in range(len(entry.history)):
+            assert f"{entry.key}[history][{i}]" in labels, f"{entry.key} row {i} not checked"
+
+
+@pytest.mark.network
+def test_every_source_url_returns_200():
+    """PROOF A-01 #2. Covers manual source_urls, rates primary_source_urls, and every history row."""
+    urls = source_urls_to_check()
     assert urls, "no source_url set on any entry yet"
     bad = []
-    for key, url in sorted(urls.items()):
+    for url, labels in sorted(urls.items()):
         try:
             r = requests.get(url, timeout=30, headers={"User-Agent": catalog.USER_AGENT})
             if r.status_code != 200:
-                bad.append(f"{key}: {url} -> {r.status_code}")
+                bad.append(f"{','.join(labels)}: {url} -> {r.status_code}")
         except Exception as exc:
-            bad.append(f"{key}: {url} -> {type(exc).__name__}")
+            bad.append(f"{','.join(labels)}: {url} -> {type(exc).__name__}")
     assert not bad, "URLs that did not return 200:\n  " + "\n  ".join(bad)
 
 
