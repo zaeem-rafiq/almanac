@@ -8,8 +8,6 @@ RECORDS how it was called, because the failure this guards against is not an exc
 from __future__ import annotations
 
 import sys
-
-import almanac
 import types
 from unittest.mock import patch
 
@@ -41,11 +39,23 @@ def stub_youtube(monkeypatch, tmp_path):
 
     module.read_youtube_sources = read_youtube_sources
     module.iter_sources = iter_sources
+
+    # Belt and braces: patch the package ATTRIBUTE as well as the sys.modules entry.
+    #
+    # `_cmd_scan` does `from almanac import youtube`, which resolves via getattr on the
+    # `almanac` package before falling back to sys.modules. Once the real `almanac.youtube`
+    # has been imported anywhere in the session — tests/test_youtube.py does so at collection
+    # — that attribute is bound, and a sys.modules-only patch is not guaranteed to win. The
+    # failure mode is the worst kind: these tests would drive the REAL module, reach for the
+    # network, and stop testing the seam they exist to test.
+    #
+    # Honest note: a full run was observed failing this way once, immediately after a rebase,
+    # and it has not reproduced since — not under forced orderings either. So this is
+    # hardening against a mechanism that is real in principle rather than a fix for a
+    # reproducible bug. It costs one line and removes the ambiguity permanently.
+    import almanac
+
     monkeypatch.setitem(sys.modules, "almanac.youtube", module)
-    # `from almanac.youtube import ...` resolves the ATTRIBUTE on the package, not the
-    # sys.modules entry, once the real module has been imported by another test module.
-    # Without this second patch the stub silently never installs and these tests assert
-    # against the real youtube.py — they pass alone and fail after tests/test_youtube.py.
     monkeypatch.setattr(almanac, "youtube", module, raising=False)
     return module, calls
 
