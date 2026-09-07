@@ -125,3 +125,68 @@ day one and the demo self-destructs. See Gap G-1.
 | Date authorised | Channel id | Scope | Notes |
 |---|---|---|---|
 | _pending A-00 execution_ | — | `.../auth/youtube.force-ssl` | 7-day refresh-token expiry for Testing-mode apps |
+
+---
+
+## 8. Gap resolutions observed during A-00 execution (2026-09-07)
+
+Appended per the append-only rule. Each answer below is an observation against live services
+with Zaeem's own credentials, not a documentation claim.
+
+### G-3 — RESOLVED. Anthropic accepts Pydantic's `$defs`/`$ref` schema.
+
+`messages.create` with `tools=[{name, description, input_schema=Claims.model_json_schema()}]`
+and `tool_choice={"type":"tool","name":"record_claims"}` against `claude-opus-5` returned a
+`tool_use` block whose `input` validated cleanly through the nested model — 2 claims parsed.
+**No schema flattening is needed.** `extract.py` (A-03/A-04) may use `model_json_schema()`
+output directly.
+
+### G-1 — RESOLVED, and it cost us a spec correction plus a confirmed hazard.
+
+**(a) The endpoint path in the issue text is wrong.** `economics-indicators` returns HTTP 404
+with an empty body. The live path is **`economic-indicators`** — singular "economic".
+Verified by sweeping seven path spellings; only that one returned 200.
+
+**(b) The legacy API generations are dead.** Both `/api/v3` and `/api/v4` now return HTTP 403:
+*"Legacy Endpoint : Due to Legacy endpoints being no longer supported - This endpoint is only
+available for legacy users who have valid subscriptions prior August 31, 2025."*
+`/stable` is the only live generation, so `preflight.py`'s base-discovery loop was removed —
+there is nothing to fall back to, and the loop was masking the real error by reporting only the
+last base tried.
+
+**(c) The staleness in §5b is REAL and reproduces on the REST path with our own key:**
+
+| series | newest `date` | rows |
+|---|---|---|
+| `federalFunds` | 2025-12-01 | 3 |
+| `30YearFixedRateMortgageAverage` | 2025-12-04 | 13 |
+| `CPI` | 2025-12-01 | 2 |
+| `treasury-rates` (`year10`) | **2026-09-04** | 63 |
+
+Three of four series lag roughly nine months; only Treasury is current. **A-01 must set
+`max_age_days` per series from these observed cadences.** A single global freshness threshold
+makes Almanac declare its own rates table stale on day one.
+
+Note also that `CPI` returns only 2 rows by default, but §5a's year-over-year derivation needs
+observations 12 months apart — A-01 must pass `from_date`/`to_date` to widen the window.
+
+### G-4 — NOT RESOLVED. OAuth consent succeeds; channel identity does not match.
+
+Consent completed twice against client `476960580777-…apps.googleusercontent.com` with scope
+`https://www.googleapis.com/auth/youtube.force-ssl`. Both times
+`channels().list(part="id", mine=True)` returned **zero items**, while
+`channels().list(part="id,snippet", id="UCvt3Yfxa3lq_FyO2gAr3aQQ")` returned one item
+(title `Zaeem Khan`, published `2026-09-07T16:33:26Z`). The target channel is real; the
+authorised Google identity does not own it. See `docs/blockers/A-00.md`.
+
+The YouTube Data API v3 **is** enabled on project `almanac-hackathon` — an unenabled API
+returns `accessNotConfigured`, and both calls above returned 200.
+
+### G-2, G-5 — unchanged, open by design.
+
+## 7a. OAuth authorisation log (continued)
+
+| Date | Channel id returned by `mine=true` | Scope | Result |
+|---|---|---|---|
+| 2026-09-07 | *(none — 0 items)* | `.../youtube.force-ssl` | FAIL, wrong identity |
+| 2026-09-07 | *(none — 0 items, forced `select_account consent`)* | `.../youtube.force-ssl` | FAIL, wrong identity |

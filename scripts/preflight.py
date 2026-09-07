@@ -30,13 +30,14 @@ TOKEN_PATH = ROOT / "token.json"
 CLIENT_SECRET_PATH = ROOT / "client_secret.json"
 YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.force-ssl"]
 
-# ADR-000 gap G-1: the base URL for this account's plan is discovered by observation, not
-# assumed. The first base that returns a non-empty list wins, and preflight reports which.
-FMP_BASES = (
-    "https://financialmodelingprep.com/stable",
-    "https://financialmodelingprep.com/api/v4",
-    "https://financialmodelingprep.com/api/v3",
-)
+# ADR-000 gap G-1, RESOLVED 2026-09-07 by observation against the real key:
+#   * /api/v3 and /api/v4 are dead — both 403 with "Legacy Endpoint : ... only available for
+#     legacy users who have valid subscriptions prior August 31, 2025". /stable is the only
+#     live generation, so there is nothing to fall back to and no base discovery to do.
+#   * The indicator path is `economic-indicators` (singular "economic"). The spelling
+#     `economics-indicators` returns 404 with an empty body.
+FMP_BASE = "https://financialmodelingprep.com/stable"
+FMP_INDICATOR_PATH = "economic-indicators"
 # label -> FMP indicator name, in the order the PROOF line lists them.
 FMP_SERIES = {
     "federalFunds": "federalFunds",
@@ -151,30 +152,21 @@ def _fmp_get(base: str, path: str, params: dict[str, str], api_key: str):
 
 
 def check_fmp() -> tuple[str, bool, str]:
-    """Prove all four series answer, and report how fresh each one is (gap G-1, KTD3)."""
+    """Prove all four series answer, and report how fresh each one is (gap G-1, KTD3).
+
+    Reports every series' own failure rather than the last one seen — a single run must name
+    each broken series, not just whichever failed most recently.
+    """
     api_key = os.environ.get("FMP_API_KEY")
     if not api_key:
         return ("fmp", False, "FMP_API_KEY ABSENT")
 
-    base_used, last_error = None, "no base tried"
-    for base in FMP_BASES:
-        try:
-            rows = _fmp_get(base, "economics-indicators", {"name": "federalFunds"}, api_key)
-            if isinstance(rows, list) and rows:
-                base_used = base
-                break
-            last_error = f"{base} -> 200 but empty list"
-        except Exception as exc:
-            last_error = f"{base} -> {type(exc).__name__}: {str(exc)[:80]}"
-    if base_used is None:
-        return ("fmp", False, f"no working base URL ({last_error})")
-
     freshness, failures = [], []
     for label, name in FMP_SERIES.items():
         try:
-            rows = _fmp_get(base_used, "economics-indicators", {"name": name}, api_key)
+            rows = _fmp_get(FMP_BASE, FMP_INDICATOR_PATH, {"name": name}, api_key)
         except Exception as exc:
-            failures.append(f"{label}: {type(exc).__name__}")
+            failures.append(f"{label}: {type(exc).__name__} {str(exc)[:60]}")
             continue
         if not isinstance(rows, list) or not rows:
             failures.append(f"{label}: 0 rows")
@@ -183,7 +175,7 @@ def check_fmp() -> tuple[str, bool, str]:
         freshness.append(f"{label}@{newest}({len(rows)}r)")
 
     try:
-        rows = _fmp_get(base_used, "treasury-rates", {}, api_key)
+        rows = _fmp_get(FMP_BASE, "treasury-rates", {}, api_key)
         if not isinstance(rows, list) or not rows:
             failures.append("treasury10: 0 rows")
         else:
@@ -193,10 +185,9 @@ def check_fmp() -> tuple[str, bool, str]:
             else:
                 freshness.append(f"treasury10@{newest_row['date']}({len(rows)}r)")
     except Exception as exc:
-        failures.append(f"treasury10: {type(exc).__name__}")
+        failures.append(f"treasury10: {type(exc).__name__} {str(exc)[:60]}")
 
-    base_label = base_used.rsplit("/", 1)[-1]
-    detail = f"base={base_label} " + " ".join(freshness)
+    detail = "base=stable " + " ".join(freshness)
     if failures:
         return ("fmp", False, f"{detail} FAILED[{'; '.join(failures)}]")
     return ("fmp", True, detail)
@@ -231,7 +222,10 @@ def check_youtube() -> tuple[str, bool, str]:
             flow = InstalledAppFlow.from_client_secrets_file(
                 str(CLIENT_SECRET_PATH), YOUTUBE_SCOPES
             )
-            creds = flow.run_local_server(port=0)
+            # prompt="select_account consent" forces the account chooser every time. Without
+            # it Google silently reuses the signed-in identity, which is how a Brand Account
+            # channel gets missed. consent also guarantees a refresh_token comes back.
+            creds = flow.run_local_server(port=0, prompt="select_account consent")
         except Exception as exc:
             return ("youtube_oauth", False, f"consent failed: {type(exc).__name__}: {str(exc)[:120]}")
         TOKEN_PATH.write_text(creds.to_json(), encoding="utf-8")
@@ -243,7 +237,12 @@ def check_youtube() -> tuple[str, bool, str]:
         return ("youtube_oauth", False, f"channels.list failed: {type(exc).__name__}: {str(exc)[:120]}")
 
     if not items:
-        return ("youtube_oauth", False, "channels.list(mine=True) returned no items")
+        return (
+            "youtube_oauth", False,
+            "channels.list(mine=True) returned no items — the authorised Google account owns "
+            "no YouTube channel. If the test channel is a Brand Account, re-consent and pick "
+            "the channel at the account chooser, not the personal account.",
+        )
     actual = items[0]["id"]
     if actual != expected:
         return (
