@@ -39,7 +39,20 @@ def stub_youtube(monkeypatch, tmp_path):
 
     module.read_youtube_sources = read_youtube_sources
     module.iter_sources = iter_sources
+
+    # Patching sys.modules ALONE is not enough, and the gap only opens once A-06 lands.
+    # `_cmd_scan` does `from almanac import youtube`, which reads the attribute on the
+    # `almanac` PACKAGE. Importing the real `almanac.youtube` anywhere in the session binds
+    # that attribute, after which the sys.modules entry is never consulted and these tests
+    # silently drive the REAL module — which reaches for the network and fails. That is
+    # exactly what happened once tests/test_youtube.py existed: this file passed alone and
+    # failed in a full run, purely on import order.
+    #
+    # Both are patched so the stub wins regardless of what has been imported first.
+    import almanac
+
     monkeypatch.setitem(sys.modules, "almanac.youtube", module)
+    monkeypatch.setattr(almanac, "youtube", module, raising=False)
     return module, calls
 
 
