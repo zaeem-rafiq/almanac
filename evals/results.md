@@ -1,6 +1,6 @@
 # Almanac eval — extract + judge vs. the labelled set
 
-`python -m almanac eval` · 2026-09-07 21:55 UTC
+`python -m almanac eval` · 2026-09-07 22:01 UTC
 
 **GATE: PASS**
 
@@ -9,12 +9,12 @@
 | | |
 |---|---|
 | sources read | 7 |
-| verdicts produced | 82 |
+| verdicts produced | 77 |
 | labelled rows | 54 |
 | **rows matched** | **48 / 54** |
 | labelled rows with no claim | 6 |
 | labelled quotes absent from their source | 0 |
-| verdicts with no labelled row | 34 |
+| verdicts with no labelled row | 29 |
 | extraction | live |
 
 Matching: a verdict's quote covers ≥ 0.90 of the labelled quote, greedy and one-to-one, ties broken by the tighter quote.

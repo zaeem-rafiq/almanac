@@ -10,6 +10,7 @@ check is capable of failing.
 from __future__ import annotations
 
 import ast
+import re
 import subprocess
 import sys
 import time
@@ -184,11 +185,23 @@ def proof_judge_tests() -> tuple[str, bool]:
     green = completed.returncode == 0
     ok = ok and green
     tail = completed.stdout.strip().splitlines()[-1] if completed.stdout.strip() else "no output"
+    # WHICH numbering: judge.py's own, not the issue text's. The two diverge from R2 onward, a
+    # deliberate change recorded in docs/walkthroughs/A-04.md. Asserting the issue's numbering
+    # would check nothing — a statutory limit that differs fires R5.stale_material here, not R4.
+    # So the proof also confirms each asserted rule name is a prefix judge.py actually emits.
+    judge_src = (REPO_ROOT / "almanac" / "judge.py").read_text(encoding="utf-8")
+    # R5 builds its name with an f-string (`rule_fired=f"R5.{status}"`), so a literal-prefix scan
+    # misses it. Match both spellings.
+    emitted = sorted(set(re.findall(r'rule_fired=f?"(R\d)\.', judge_src)))
+    ok = ok and emitted == list(RULES)
     return line(
         "pytest tests/test_judge.py covers R1-R5 with one assertion each",
         ok,
-        f"{detail} | control: 0 test_r9_* functions, so the counter discriminates | "
-        f"pytest tests/test_judge.py → {tail}",
+        f"asserted against judge.py's OWN numbering (R1=historical window, R2=unjudged type, "
+        f"R4=exact match, R5=divergence), not the issue text's — the two diverge from R2 onward "
+        f"per docs/walkthroughs/A-04.md; rule prefixes judge.py actually emits: "
+        f"{','.join(emitted)} | {detail} | control: 0 test_r9_* functions, so the counter "
+        f"discriminates | pytest tests/test_judge.py → {tail}",
     ), ok
 
 

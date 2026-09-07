@@ -219,3 +219,79 @@ outing — that is the harness working, not the harness misbehaving.**
 
 **Zaeem's call:** (a) pin `temperature=0.0` and re-measure, (b) treat the flake as an A-03 bug and
 file it, or (c) accept an intermittently-red gate for the demo and say so out loud.
+
+---
+
+## D-6 — the missing `confidence` rule would not fire, and that is the problem
+
+**Status:** AWAITING RATIFICATION · **Fix applied:** none — `judge.py` and `models.py` are both
+protected from this branch. Measured here, not changed.
+
+Verified: `grep -n confidence almanac/judge.py` returns nothing. `Claim.confidence` is required and
+populated, and no rule consults it. The issue's spec R3 is `confidence < 0.6 -> unresolved`.
+
+**Measured over 75 produced claims in one live run:**
+
+| | |
+|---|---|
+| min / median / max | **0.60** / 0.90 / 0.97 |
+| histogram (rounded) | 0.6 ×6 · 0.7 ×6 · 0.8 ×19 · 0.9 ×43 · 1.0 ×1 |
+| claims below 0.6 | **0 of 75** |
+| verdicts spec-R3 would rewrite | **0** |
+| status disagreements to correlate against | **0** — there are none |
+| mean confidence by status | `correct` 0.940 · `stale_material` 0.940 · `stale_immaterial` 0.945 · `skip` 0.912 · `unresolved` 0.838 |
+
+**The finding is not "a rule is missing". It is that adding the rule as specified would change
+nothing while appearing to add a safeguard.** The extractor's prompt asks only for "0 to 1: how
+sure you are of this labelling" with no floor, yet the model never returns below 0.60 and puts 58
+of 75 claims at 0.8–0.9. The signal is compressed into a narrow high band, so a 0.6 threshold is a
+no-op *by construction* — not because extraction is reliably confident. Shipping spec-R3 as
+written would buy false assurance that low-confidence extractions are handled.
+
+Note this sits against D-5: extraction **does** drop claims between runs, and it does so while
+reporting high confidence on everything it keeps. Confidence is not currently tracking the failure
+mode that actually exists.
+
+**Zaeem's call:** (a) leave `confidence` unconsulted and delete it from the spec, (b) calibrate
+the prompt so the number spans a usable range before any rule reads it, or (c) implement spec-R3
+knowing it is inert today and will stay inert until (b) happens. My read: **(b) before (c)** —
+a threshold over an uncalibrated score is decoration.
+
+---
+
+## D-7 — Q2 is thinner than A-04 thought: one datum per side, not two rows
+
+**Status:** AWAITING RATIFICATION · **Fix applied:** none. `MARKET_RATE_MATERIAL_PP` unchanged.
+
+A-04's open question Q2 calls 0.50pp "two labelled rows … thin evidence for a global constant".
+Measured, it is thinner than that. Every `market_rate` divergence in the labelled set:
+
+| line | source | entity | claimed | delta | expected | got |
+|---|---|---|---|---|---|---|
+| 10 | v2 captions | `mortgage_30y_fixed` | 6.85% | +0.14pp | `stale_immaterial` | `stale_immaterial` ✓ |
+| 51 | `fresh_wrong.md` | `mortgage_30y_fixed` | 6.85% | +0.14pp | `stale_immaterial` | `stale_immaterial` ✓ |
+| 35 | v5 captions | `ibond_composite_rate` | 3.11% | −1.15pp | `stale_material` | `stale_material` ✓ |
+| 49 | `fresh_ok.md` | `mortgage_30y_fixed` | 6.71% | +0.00pp | `correct` | `correct` ✓ |
+
+Lines 10 and 51 are **the same number against the same catalog entry** — `mortgage_30y_fixed` at
+6.85% — appearing once in a caption track and once in a script. So the immaterial side rests on
+**one distinct (entity, value) pair**, not two independent observations, and the material side on
+one. The constant is calibrated on one datum per side.
+
+**All four rows classify correctly at 0.50**, so nothing here argues for moving it — and there is
+no evidence anywhere in (0.14, 1.15) to place it better. **It was not changed**, per the issue's
+explicit instruction. What this measurement adds is that A-04's suggested remedy — a per-key
+threshold in `facts/catalog.yaml` beside `max_age_days` — cannot be evidenced from this labelled
+set either: with one datum per side there is nothing to fit per key. Widening the set is the
+prerequisite, not a better-placed constant.
+
+---
+
+## Note on the baseline comparison
+
+A peer session's `scan --source corpus` baseline (64 verdicts) and this harness's totals (65–82)
+are not directly comparable: `cli.CORPUS_CHANNEL` scopes `scan --source corpus` to
+`corpus/channel` — the 5 videos — while `eval` covers every source the labels reference, which is
+those 5 **plus** `corpus/scripts/fresh_ok.md` and `fresh_wrong.md`. The labels split 40 / 14 across
+those trees. So "64 verdicts vs 54 labelled rows" compares a 5-video scan against a 7-source label
+set; the like-for-like figure is 64 verdicts against the 40 channel labels.
