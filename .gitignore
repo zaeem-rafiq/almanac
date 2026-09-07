@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 client_secret.json
 .DS_Store
+renders/
