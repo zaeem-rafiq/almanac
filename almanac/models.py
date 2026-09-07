@@ -83,8 +83,18 @@ ClaimType = Literal[
     "market_rate",
     "illustrative",
     "historical",
+    "structural",
     "other",
 ]
+"""The seven labels a claim can carry.
+
+`structural` is a deliberate addition to the six HAC-39 lists, made on Zaeem's instruction while
+models.py was still editable (A-03 finding F-1). `evals/claims.jsonl` already labelled four rows
+`structural` — the mechanics of how a product works, such as a twelve-month lockup or a rate that
+resets each May and November — and without the label those rows collapsed into `other`, which
+throws away the distinction between "a rule about how this account behaves" and "a number we could
+not classify". `other` remains the catch-all for genuinely unclassifiable numbers.
+"""
 
 
 class Claim(BaseModel):

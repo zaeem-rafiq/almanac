@@ -182,6 +182,50 @@ def test_system_prompt_contains_no_verdict_vocabulary():
     assert not hits, f"verdict language leaked into the extraction prompt: {hits}"
 
 
+def test_claim_type_vocabulary_is_the_seven_labels_and_the_prompt_teaches_every_one():
+    """models.py locks after A-03, so the vocabulary is pinned here.
+
+    `structural` is the seventh label, added on Zaeem's instruction (finding F-1) because
+    evals/claims.jsonl already used it and the six-label set collapsed those rows into `other`.
+    """
+    import typing
+
+    from almanac.models import ClaimType
+
+    labels = typing.get_args(ClaimType)
+    assert labels == (
+        "statutory_limit", "tax_bracket", "market_rate",
+        "illustrative", "historical", "structural", "other",
+    )
+
+    prompt = build_system_prompt()
+    for label in labels:
+        assert f"{label} " in prompt, f"the prompt never defines {label}"
+
+
+def test_structural_is_distinguished_from_other_in_the_prompt():
+    prompt = build_system_prompt()
+    assert "you cannot touch the money for twelve months" in prompt
+    assert "rule about HOW a product or account works" in prompt
+
+
+def test_every_claim_type_in_the_eval_set_is_in_the_vocabulary():
+    """A label A-02 uses that A-03 cannot express is a silent downgrade to `other`."""
+    import typing
+
+    from almanac.models import ClaimType
+
+    rows = [
+        json.loads(line)
+        for line in (REPO_ROOT / "evals/claims.jsonl").read_text().splitlines()
+        if line.strip()
+    ]
+    assert len(rows) == 54
+    labels = set(typing.get_args(ClaimType))
+    unexpressible = sorted({r["expected_claim_type"] for r in rows} - labels)
+    assert not unexpressible, f"eval labels A-03 cannot express: {unexpressible}"
+
+
 def test_the_three_way_distinction_is_taught_with_examples():
     prompt = build_system_prompt()
     assert "the 401(k) limit is $23,000" in prompt

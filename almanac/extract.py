@@ -329,8 +329,15 @@ illustrative    - a number the speaker made up to carry an example. The giveaway
   round hypothetical salary, balance, or monthly contribution.
 historical      - a number the speaker explicitly places in the past. The giveaway is a past-tense
   frame plus a time marker: "back in 2022 it paid", "it used to be", "last year it was".
-other           - a sentence with a number that is none of the above: durations, counts, holding
-  periods, penalties expressed in months, step numbers, fund counts, structural mechanics.
+structural      - a rule about HOW a product or account works, rather than a value it currently
+  carries: lockup periods, holding periods, when a rate resets, redemption penalties expressed in
+  time, age thresholds that change how the account behaves, eligibility conditions. These are the
+  mechanics of the instrument. They are not set by a contribution table and they do not move with
+  the market: "you cannot touch the money for twelve months", "it resets on the first of May and
+  the first of November", "if you cash out before five years you give up three months of interest",
+  "non medical withdrawals before sixty five get taxed and penalized".
+other           - a sentence with a number that is none of the above: step numbers, fund counts,
+  and any other number you cannot place in one of the six labels above.
 
 ## The distinction that matters most
 
