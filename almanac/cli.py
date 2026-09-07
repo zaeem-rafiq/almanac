@@ -104,6 +104,37 @@ def _cmd_rates(args) -> int:
     return 1 if failures else 0
 
 
+def _cmd_extract(args) -> int:
+    """`extract <path>` — label every numeric sentence in a video directory, file, or tree.
+
+    This is one of only two commands that reach a model. It prints labels, never verdicts:
+    nothing in this output says whether a number is right. That is `judge` (A-04).
+    """
+    from almanac.extract import discover_sources, extract_sources
+
+    sources = discover_sources(args.target)
+    by_source = extract_sources(sources)
+
+    total = 0
+    for source in sources:
+        claims = by_source[source.source_id]
+        total += len(claims)
+        print(f"\n{source.source_id}  —  {len(claims)} claim(s)")
+        print(f"{'LOCATOR':<14} {'TYPE':<16} {'ENTITY_KEY':<26} {'VALUE':>12} {'UNIT':<5} {'YR':<5} {'CONF':>5}  QUOTE")
+        print("-" * 150)
+        for claim in claims:
+            value = "—" if claim.value is None else f"{claim.value:,.2f}"
+            quote = claim.quote if len(claim.quote) <= 62 else claim.quote[:59] + "..."
+            print(
+                f"{claim.locator:<14} {claim.claim_type:<16} {(claim.entity_key or '—'):<26} "
+                f"{value:>12} {(claim.unit or '—'):<5} {(str(claim.year_hint) if claim.year_hint else '—'):<5} "
+                f"{claim.confidence:>5.2f}  {quote}"
+            )
+    print("-" * 150)
+    print(f"{len(sources)} source(s) · {total} claim(s)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
@@ -116,6 +147,10 @@ def main(argv: list[str] | None = None) -> int:
     rates = sub.add_parser("rates", help="refresh facts/rates.json from the primary feeds")
     rates.add_argument("--refresh", action="store_true", help="fetch and write the rates table")
     rates.set_defaults(func=_cmd_rates)
+
+    extract = sub.add_parser("extract", help="label the numeric claims in a script or caption file")
+    extract.add_argument("target", help="a .srt/.md file, a video directory, or a tree of them")
+    extract.set_defaults(func=_cmd_extract)
 
     args = parser.parse_args(argv)
     return args.func(args)
