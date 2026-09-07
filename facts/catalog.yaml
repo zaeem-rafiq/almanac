@@ -21,165 +21,165 @@ entities:
     kind: statutory_limit
     source: manual
     unit: usd
-    value: null
-    effective_from: null
+    value: 24500.0
+    effective_from: 2026-01-01
     effective_to: null
-    source_url: null
+    source_url: https://www.irs.gov/retirement-plans/cola-increases-for-dollar-limitations-on-benefits-and-contributions
     history:
-      - value: null
-        effective_from: null
-        effective_to: null
-        source_url: null
+      - value: 23500.0
+        effective_from: 2025-01-01
+        effective_to: 2025-12-31
+        source_url: https://www.irs.gov/retirement-plans/cola-increases-for-dollar-limitations-on-benefits-and-contributions
 
   - key: k401_catchup_50plus
     label: 401(k) catch-up contribution, age 50+
     kind: statutory_limit
     source: manual
     unit: usd
-    value: null
-    effective_from: null
+    value: 8000.0
+    effective_from: 2026-01-01
     effective_to: null
-    source_url: null
+    source_url: https://www.irs.gov/retirement-plans/cola-increases-for-dollar-limitations-on-benefits-and-contributions
     history:
-      - value: null
-        effective_from: null
-        effective_to: null
-        source_url: null
+      - value: 7500.0
+        effective_from: 2025-01-01
+        effective_to: 2025-12-31
+        source_url: https://www.irs.gov/retirement-plans/cola-increases-for-dollar-limitations-on-benefits-and-contributions
 
   - key: ira_contribution
     label: IRA contribution limit
     kind: statutory_limit
     source: manual
     unit: usd
-    value: null
-    effective_from: null
+    value: 7500.0
+    effective_from: 2026-01-01
     effective_to: null
-    source_url: null
+    source_url: https://www.irs.gov/retirement-plans/plan-participant-employee/retirement-topics-ira-contribution-limits
     history:
-      - value: null
-        effective_from: null
-        effective_to: null
-        source_url: null
+      - value: 7000.0
+        effective_from: 2025-01-01
+        effective_to: 2025-12-31
+        source_url: https://www.irs.gov/retirement-plans/plan-participant-employee/retirement-topics-ira-contribution-limits
 
   - key: ira_catchup_50plus
     label: IRA catch-up contribution, age 50+
     kind: statutory_limit
     source: manual
     unit: usd
-    value: null
-    effective_from: null
+    value: 1100.0
+    effective_from: 2026-01-01
     effective_to: null
-    source_url: null
+    source_url: https://www.irs.gov/newsroom/401k-limit-increases-to-24500-for-2026-ira-limit-increases-to-7500
     history:
-      - value: null
-        effective_from: null
-        effective_to: null
-        source_url: null
+      - value: 1000.0
+        effective_from: 2025-01-01
+        effective_to: 2025-12-31
+        source_url: https://www.irs.gov/newsroom/401k-limit-increases-to-24500-for-2026-ira-limit-increases-to-7500
 
   - key: hsa_self_only
     label: HSA contribution limit, self-only coverage
     kind: statutory_limit
     source: manual
     unit: usd
-    value: null
-    effective_from: null
+    value: 4400.0
+    effective_from: 2026-01-01
     effective_to: null
-    source_url: null
+    source_url: https://www.irs.gov/publications/p969
     history:
-      - value: null
-        effective_from: null
-        effective_to: null
-        source_url: null
+      - value: 4300.0
+        effective_from: 2025-01-01
+        effective_to: 2025-12-31
+        source_url: https://www.irs.gov/publications/p969
 
   - key: hsa_family
     label: HSA contribution limit, family coverage
     kind: statutory_limit
     source: manual
     unit: usd
-    value: null
-    effective_from: null
+    value: 8750.0
+    effective_from: 2026-01-01
     effective_to: null
-    source_url: null
+    source_url: https://www.irs.gov/publications/p969
     history:
-      - value: null
-        effective_from: null
-        effective_to: null
-        source_url: null
+      - value: 8550.0
+        effective_from: 2025-01-01
+        effective_to: 2025-12-31
+        source_url: https://www.irs.gov/publications/p969
 
   - key: standard_deduction_single
     label: Standard deduction, single filer
     kind: statutory_limit
     source: manual
     unit: usd
-    value: null
-    effective_from: null
+    value: 16100.0
+    effective_from: 2026-01-01
     effective_to: null
-    source_url: null
+    source_url: https://www.irs.gov/pub/irs-drop/rp-25-32.pdf
     history:
-      - value: null
-        effective_from: null
-        effective_to: null
-        source_url: null
+      - value: 15750.0
+        effective_from: 2025-01-01
+        effective_to: 2025-12-31
+        source_url: https://www.irs.gov/pub/irs-drop/rp-25-32.pdf
 
   - key: standard_deduction_mfj
     label: Standard deduction, married filing jointly
     kind: statutory_limit
     source: manual
     unit: usd
-    value: null
-    effective_from: null
+    value: 32200.0
+    effective_from: 2026-01-01
     effective_to: null
-    source_url: null
+    source_url: https://www.irs.gov/pub/irs-drop/rp-25-32.pdf
     history:
-      - value: null
-        effective_from: null
-        effective_to: null
-        source_url: null
+      - value: 31500.0
+        effective_from: 2025-01-01
+        effective_to: 2025-12-31
+        source_url: https://www.irs.gov/pub/irs-drop/rp-25-32.pdf
 
   - key: ss_wage_base
     label: Social Security taxable wage base
     kind: statutory_limit
     source: manual
     unit: usd
-    value: null
-    effective_from: null
+    value: 184500.0
+    effective_from: 2026-01-01
     effective_to: null
-    source_url: null
+    source_url: https://www.irs.gov/publications/p15
     history:
-      - value: null
-        effective_from: null
-        effective_to: null
-        source_url: null
+      - value: 176100.0
+        effective_from: 2025-01-01
+        effective_to: 2025-12-31
+        source_url: https://www.irs.gov/publications/p15
 
   - key: gift_annual_exclusion
     label: Annual gift tax exclusion
     kind: statutory_limit
     source: manual
     unit: usd
-    value: null
-    effective_from: null
+    value: 19000.0
+    effective_from: 2026-01-01
     effective_to: null
-    source_url: null
+    source_url: https://www.irs.gov/businesses/small-businesses-self-employed/frequently-asked-questions-on-gift-taxes
     history:
-      - value: null
-        effective_from: null
-        effective_to: null
-        source_url: null
+      - value: 19000.0
+        effective_from: 2025-01-01
+        effective_to: 2025-12-31
+        source_url: https://www.irs.gov/businesses/small-businesses-self-employed/frequently-asked-questions-on-gift-taxes
 
   - key: ibond_composite_rate
     label: Series I savings bond composite rate
     kind: market_rate
     source: manual
     unit: pct
-    value: null
-    effective_from: null
-    effective_to: null
-    source_url: null
+    value: 4.26
+    effective_from: 2026-05-01
+    effective_to: 2026-10-31
+    source_url: https://www.treasurydirect.gov/files/savings-bonds/i-bond-rate-chart.pdf
     history:
-      - value: null
-        effective_from: null
-        effective_to: null
-        source_url: null
+      - value: 3.98
+        effective_from: 2025-05-01
+        effective_to: 2025-10-31
+        source_url: https://www.treasurydirect.gov/files/savings-bonds/i-bond-rate-chart.pdf
 
   # ============ source: rates (written by `rates --refresh` — do not hand-edit) ============
   - key: fed_funds_effective
