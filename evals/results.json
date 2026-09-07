@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-09-07T22:01:13+00:00",
+  "run_at": "2026-09-07T23:50:00+00:00",
   "gate": {
     "passed": true,
     "failures": [],
@@ -16,26 +16,26 @@
       "corpus/scripts/fresh_ok.md",
       "corpus/scripts/fresh_wrong.md"
     ],
-    "verdicts_produced": 77,
+    "verdicts_produced": 115,
     "labelled_rows": 54,
-    "matched": 48,
-    "unmatched_labels": 6,
+    "matched": 46,
+    "unmatched_labels": 8,
     "unlocatable_labels": 0,
-    "unmatched_verdicts": 29,
+    "unmatched_verdicts": 69,
     "min_label_coverage": 0.9,
     "sensitivity": {
-      "0.50": 49,
+      "0.50": 52,
       "0.70": 48,
-      "0.90": 48,
-      "1.00": 48
+      "0.90": 46,
+      "1.00": 46
     },
     "extraction": "live"
   },
-  "extraction_recall": 0.8888888888888888,
+  "extraction_recall": 0.8518518518518519,
   "claim_type": {
-    "accuracy": 0.9791666666666666,
-    "hits": 47,
-    "of": 48,
+    "accuracy": 0.9782608695652174,
+    "hits": 45,
+    "of": 46,
     "confusion": [
       {
         "expected": "historical",
@@ -45,11 +45,11 @@
       {
         "expected": "illustrative",
         "got": "illustrative",
-        "n": 20
+        "n": 19
       },
       {
         "expected": "illustrative",
-        "got": "structural",
+        "got": "other",
         "n": 1
       },
       {
@@ -65,7 +65,7 @@
       {
         "expected": "structural",
         "got": "structural",
-        "n": 4
+        "n": 3
       }
     ]
   },
@@ -73,12 +73,12 @@
     {
       "status": "skip",
       "precision": 1.0,
-      "recall": 0.8125,
-      "true_positives": 26,
+      "recall": 0.75,
+      "true_positives": 24,
       "false_positives": 0,
-      "false_negatives": 6,
+      "false_negatives": 8,
       "support": 32,
-      "not_extracted": 6
+      "not_extracted": 8
     },
     {
       "status": "correct",
@@ -130,12 +130,12 @@
     {
       "expected": "skip",
       "got": "<not extracted>",
-      "n": 6
+      "n": 8
     },
     {
       "expected": "skip",
       "got": "skip",
-      "n": 26
+      "n": 24
     },
     {
       "expected": "stale_immaterial",
@@ -155,7 +155,7 @@
   ],
   "hard_negatives": {
     "labelled": 28,
-    "matched": 22,
+    "matched": 21,
     "false_positives": 0,
     "claim_types": [
       "historical",
@@ -167,23 +167,9 @@
   "misses": [],
   "not_extracted": [
     {
-      "line": 5,
+      "line": 7,
       "source": "corpus/channel/v1-401k-limits-explained/captions.srt",
-      "quote": "Say you make seventy thousand dollars",
-      "expected_status": "skip",
-      "expected_claim_type": "illustrative"
-    },
-    {
-      "line": 12,
-      "source": "corpus/channel/v2-mortgage-or-invest/captions.srt",
-      "quote": "Say you have three hundred thousand dollars left on the loan",
-      "expected_status": "skip",
-      "expected_claim_type": "illustrative"
-    },
-    {
-      "line": 14,
-      "source": "corpus/channel/v2-mortgage-or-invest/captions.srt",
-      "quote": "an extra five hundred dollars a month you could throw at either side",
+      "quote": "Six percent is four thousand two hundred dollars of your own money",
       "expected_status": "skip",
       "expected_claim_type": "illustrative"
     },
@@ -195,16 +181,44 @@
       "expected_claim_type": "illustrative"
     },
     {
-      "line": 27,
+      "line": 29,
       "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
-      "quote": "you have no debt above eight percent",
+      "quote": "Whatever is left goes into three funds. Not thirty. Three.",
       "expected_status": "skip",
       "expected_claim_type": "illustrative"
     },
     {
-      "line": 29,
+      "line": 30,
       "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
-      "quote": "Whatever is left goes into three funds. Not thirty. Three.",
+      "quote": "Say you go sixty forty, sixty percent stocks and forty percent bonds",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 31,
+      "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "quote": "Or eighty twenty if you are younger",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 33,
+      "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "quote": "Over thirty years, at that assumed rate, a lump sum roughly doubles about three and a half times",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 39,
+      "source": "corpus/channel/v5-ibonds-vs-high-yield-savings/captions.srt",
+      "quote": "If you cash out before five years you give up three months of interest",
+      "expected_status": "skip",
+      "expected_claim_type": "structural"
+    },
+    {
+      "line": 52,
+      "source": "corpus/scripts/fresh_wrong.md",
+      "quote": "Say you make $50,000 and your plan matches the first 5%",
       "expected_status": "skip",
       "expected_claim_type": "illustrative"
     }
