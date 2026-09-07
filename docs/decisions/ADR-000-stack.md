@@ -337,3 +337,58 @@ Consequences worth recording:
   if observed. The first (`captions.list` = 1) was caught by reading the docs; this one was
   caught only by the API refusing. The durable lesson is that a documentation paraphrase is
   evidence about the paraphrase, not about the API.
+
+---
+
+## 10. Correction to §4 — `temperature` is not available on `claude-opus-5` at all
+
+Appended 2026-09-07. Append-only per the Project Rules; §4 is left as written and corrected here.
+
+**What §4 said.** Its parameter list for `client.messages.create(...)` included `temperature*`.
+That line is wrong for this stack, and it is load-bearing: it is the line that makes adding
+`temperature=0.0` to `extract.py` look safe.
+
+**What is true.** Verified three ways against the installed SDK and the live API, not from memory:
+
+| Check | Result |
+|---|---|
+| `inspect.signature(client.messages.create).parameters` on `anthropic==1.4.0` | **no `temperature`** |
+| passing `temperature=0.0` directly | `TypeError: Messages.create() got an unexpected keyword argument 'temperature'` |
+| passing `extra_body={"temperature": 0}` (reaches the API as a raw field) | **HTTP 400** — `` `temperature` is deprecated for this model. `` |
+| passing `output_config={"temperature": 0}` | HTTP 400 — `output_config.temperature: Extra inputs are not permitted` |
+
+The full accepted parameter set on this SDK is:
+`cache_control, container, extra_body, extra_headers, extra_query, inference_geo, max_tokens,
+messages, metadata, model, output_config, service_tier, stop_sequences, stream, system, thinking,
+timeout, tool_choice, tools, user_profile_id, workspace_id`.
+`OutputConfigParam` carries only `effort` and `format`.
+
+**This is not an SDK packaging gap — it is a model capability.** The third row is the decisive one:
+`extra_body` passes the field through to the API untouched, and the API rejects it by name. So there
+is no wrapper, no version pin, and no passthrough that restores it. `temperature` is simply not a
+control that exists for `claude-opus-5`.
+
+### 10a. Consequence — the determinism problem is real, but sampling controls cannot solve it
+
+An in-flight edit to `almanac/extract.py` adds `temperature=0.0` to make extraction deterministic,
+citing measured variance (A-05: 65–77 verdicts on identical input across five live runs, with the
+eval gate failing 2 in 5 because the i-bond `stale_material` sentence was intermittently dropped).
+
+**The problem it describes is real and the reasoning is sound; the mechanism cannot work.** Per §10
+the call fails before it reaches the model, and forcing the field through fails at the API. A fix has
+to come from somewhere other than the sampling parameters — the SDK exposes no seed either. Options
+worth evaluating, none of them verified here and so all recorded as gaps rather than
+recommendations: making the pipeline tolerant of extraction variance rather than assuming a fixed
+claim set; a self-consistency pass that unions several extractions before judging; or narrowing what
+counts as a dropped claim in the eval gate. That choice is a design decision for whoever owns the
+variance work, not something this note settles.
+
+**No code was changed by this note.** `almanac/extract.py` carries an uncommitted `temperature=0.0`
+edit belonging to another session; it was left untouched at Zaeem's instruction, and this entry
+exists so the SDK/API facts are on record wherever that edit lands.
+
+### 10b. Observation — `ADR-002 D-5` is cited but absent from this tree
+
+The in-flight comment attributes the change to "ADR-002 D-5". `docs/decisions/` holds only
+`ADR-000-stack.md` at `d2eb390`. Either ADR-002 lives on an unmerged branch or the citation runs
+ahead of the file. Recorded as an observation, not a defect — this note does not assume which.
