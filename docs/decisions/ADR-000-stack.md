@@ -288,7 +288,7 @@ board.
 | method | units |
 |---|---|
 | `channels.list`, `playlistItems.list`, `videos.list` | 1 |
-| `videos.insert` | 1, drawn against a **separate allocation of 100 uploads/day** |
+| `videos.insert` | **1600** — see the correction below |
 | `captions.list` | **50** |
 | `captions.download` | 200 — *absent from the published table*; carried on HAC-42's authority |
 | `captions.insert` | 400 |
@@ -308,3 +308,32 @@ Observed spend on 2026-09-07: seeding 2008 units, proof scan 1253 units, ~3.3k o
 `privacyStatus: private`. Setting `public` in the request body does not override it. Making the
 five videos public therefore remains a manual step in YouTube Studio until the OAuth app passes
 Google's verification. This is the reason `scripts/seed_channel.md` exists at all.
+
+### CORRECTION to the correction — `videos.insert` is 1600 units, not 1 (2026-09-07)
+
+The table above first recorded `videos.insert` as costing 1 unit against a separate
+100-uploads/day allocation. That came from a WebFetch summary of the published quota page, read
+twice with "agreeing" results — but both reads were the same small summariser making the same
+mistake, so the agreement was worth nothing. Two reads of one paraphrase is one read.
+
+The API supplied the correction. After 5 uploads and 4 proof scans the project returned
+**HTTP 403 `quotaExceeded`**. The arithmetic only closes one way:
+
+| assumption | day's spend | consistent with the 403? |
+|---|---|---|
+| `videos.insert` = 1 | 5×1 + 5×400 + 4×1253 + ~20 = **7,037** | no — should not have failed |
+| `videos.insert` = 1600 | 5×1600 + 5×400 + 4×1253 + ~20 = **15,032** | **yes** |
+
+So `videos.insert` is 1600, and the documented "100 per day" is a separate rate limit on
+uploads rather than the unit price. `QUOTA_COSTS` now carries 1600.
+
+Consequences worth recording:
+
+* **Seeding the channel costs 10,000 units — the entire daily quota.** 5×1600 for the videos
+  plus 5×400 for the caption tracks. A re-seed and a same-day proof run cannot both happen.
+  Any future re-render/re-upload must budget for the scan to run the *next* day.
+* **Proof 4 is unaffected.** It measures the *scan* (1253 units), which contains no inserts.
+* This is the second time in this issue that an unverified quota figure was carried forward as
+  if observed. The first (`captions.list` = 1) was caught by reading the docs; this one was
+  caught only by the API refusing. The durable lesson is that a documentation paraphrase is
+  evidence about the paraphrase, not about the API.

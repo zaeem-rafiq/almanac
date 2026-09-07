@@ -309,8 +309,9 @@ def main(argv: list[str] | None = None) -> int:
         f"PROOF A-06: quota used for the full scan < {QUOTA_BUDGET:,} units "
         f"(5 x captions.download @200 + lists) = {'PASS' if quota_ok else 'FAIL'}",
         "PROOF A-06: scan --source youtube status counts == scan --source corpus status "
-        "counts = DEFERRED (needs a `scan --source {corpus,youtube}` command; A-04 has "
-        "landed extract/judge but no scan subcommand exists yet)",
+        "counts = DEFERRED (A-04's scan has landed and `--source youtube` is wired; the "
+        "comparison is blocked on the YouTube daily quota, exhausted by seeding at 1600 "
+        "units per videos.insert. Runs after the quota resets)",
     ]
 
     print("-" * 72)
