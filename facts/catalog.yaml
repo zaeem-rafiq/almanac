@@ -212,7 +212,13 @@ entities:
     effective_to: null
     source_url: https://www.freddiemac.com/pmms
     max_age_days: 10
-    history: []
+    # A-02: `history` on a rates key is hand-maintained. refresh_rates() writes
+    # facts/rates.json only and never rewrites this file, so the row is stable.
+    history:
+      - value: 6.85
+        effective_from: 2025-06-05
+        effective_to: 2025-06-11
+        source_url: https://www.freddiemac.com/pmms
 
   - key: treasury_10y
     label: 10-year Treasury constant maturity yield
