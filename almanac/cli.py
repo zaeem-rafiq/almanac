@@ -10,6 +10,7 @@ dependencies need Zaeem's approval (ADR-000 gap G-5). Hence the small reader bel
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -132,6 +133,43 @@ def _cmd_extract(args) -> int:
             )
     print("-" * 150)
     print(f"{len(sources)} source(s) · {total} claim(s)")
+def _cmd_youtube(args) -> int:
+    """Read the authorised test channel. READ-ONLY — A-06 calls no write endpoint.
+
+    `--list` also writes the real `video_id` into each corpus meta.json, which is the one
+    field in the otherwise-protected `corpus/**` tree that A-06 is allowed to touch.
+    """
+    from almanac.youtube import (
+        QuotaLedger,
+        build_client,
+        download_captions,
+        list_channel_videos,
+        match_videos_to_corpus,
+        write_video_ids,
+    )
+
+    load_env()
+    ledger = QuotaLedger()
+    youtube = build_client()
+
+    if args.captions:
+        text = download_captions(args.captions, youtube, ledger)
+        print(text if args.raw else f"{len(text)} bytes, {len(text.splitlines())} lines")
+        print(f"# quota: {ledger.units} units", file=sys.stderr)
+        return 0
+
+    videos = list_channel_videos(youtube, ledger)
+    print(f"{'VIDEO ID':<14} {'CAPS':<5} TITLE")
+    print("-" * 78)
+    for video in videos:
+        print(f"{video['video_id']:<14} {video['caption']:<5} {video['title'][:56]}")
+    print("-" * 78)
+
+    if args.write_ids:
+        changed = write_video_ids(match_videos_to_corpus(videos))
+        print(f"meta.json updated: {', '.join(changed) if changed else 'nothing to change'}")
+
+    print(f"{len(videos)} upload(s) · quota used {ledger.units} units")
     return 0
 
 
@@ -188,6 +226,15 @@ def main(argv: list[str] | None = None) -> int:
     judge_cmd.add_argument("target", help="a .srt/.md file, a video directory, or a tree of them")
     judge_cmd.add_argument("--all", action="store_true", help="include skipped claims")
     judge_cmd.set_defaults(func=_cmd_judge)
+    youtube = sub.add_parser("youtube", help="read the authorised test channel (read-only)")
+    youtube.add_argument("--list", action="store_true", help="list the channel's uploads")
+    youtube.add_argument("--captions", metavar="VIDEO_ID", help="download one video's captions")
+    youtube.add_argument("--raw", action="store_true", help="print the caption text itself")
+    youtube.add_argument(
+        "--write-ids", action="store_true",
+        help="write the matched video_id into each corpus meta.json",
+    )
+    youtube.set_defaults(func=_cmd_youtube)
 
     args = parser.parse_args(argv)
     return args.func(args)
