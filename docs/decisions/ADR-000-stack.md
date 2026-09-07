@@ -246,3 +246,65 @@ the network for rates, and every other module still reads `facts/rates.json` onl
 **Open question for Zaeem (non-blocking):** if a different/paid FMP key returns current
 `economic-indicators` rows, the original FMP path can be restored by swapping the key — the fetcher
 seam is per-key, so it is a contained change either way.
+
+---
+
+## 9. Gap resolutions and corrections observed during A-06 execution (2026-09-07)
+
+Appended per the append-only rule. Every line below is an observation against the live test
+channel `UCb0N54LdHk-10KgrL4n3LIA` with owner OAuth, not a documentation claim.
+
+### G-2 — RESOLVED. `tfmt="srt"` is accepted.
+
+`captions().download(id=..., tfmt="srt").execute()` returned an SRT body on the first attempt
+against caption track `AUieDaYHINl1hHx-…` (trackKind `standard`, language `en`) on video
+`9A126b64qug`. No fallback tfmt was needed, so the candidate list `("srt","vtt","ttml","sbv")`
+in `almanac/youtube.py` never advanced past its first entry.
+
+Confirmed alongside it: `supportsMediaDownload: True` behaves as §3 recorded — `.execute()`
+returns **bytes**, and decoding is the caller's job.
+
+Round-trip fidelity, corpus SRT vs the same track downloaded back through the API:
+**0.0000% word difference on all five videos**, against a 2% threshold whose adversarial
+control scored 3.37% (red, as required).
+
+### New signatures verified offline for A-06's seeding script (same discovery rev 20260820)
+
+| Call | httpMethod / path | Required | Notes |
+|---|---|---|---|
+| `videos.insert(part=, body=, media_body=)` | POST `youtube/v3/videos` | `part` | `supportsMediaUpload: True` |
+| `captions.insert(part=, body=, media_body=)` | POST `youtube/v3/captions` | `part` | `supportsMediaUpload: True` |
+
+`VideoStatus` carries **`containsSyntheticMedia`** (checked in the schema, not assumed). The
+corpus videos use text-to-speech narration, so the seeding script sets it true — the disclosure
+YouTube asks for, and the honest choice for a corpus that exists to demonstrate honest checking.
+
+### CORRECTION — the quota cost table. `captions.list` is 50 units, not 1.
+
+A-06's ledger originally priced every `.list` call at 1 unit, pricing a family of endpoints by
+their verb rather than by name. It is wrong: the captions resource is expensive across the
+board.
+
+| method | units |
+|---|---|
+| `channels.list`, `playlistItems.list`, `videos.list` | 1 |
+| `videos.insert` | 1, drawn against a **separate allocation of 100 uploads/day** |
+| `captions.list` | **50** |
+| `captions.download` | 200 — *absent from the published table*; carried on HAC-42's authority |
+| `captions.insert` | 400 |
+
+Source: `developers.google.com/youtube/v3/determine_quota_cost`, read twice on 2026-09-07 with
+agreeing results. The mistake understated a full scan by 245 units — **1008 reported against a
+real 1253**. Both figures pass the 1,500 budget, so nothing failed; the point is that the proof
+was passing against a number that was not true. `QuotaLedger` now holds an explicit per-endpoint
+table, an unpriced endpoint costs 1 rather than 0, and the values are pinned by
+`tests/test_youtube.py::test_captions_list_is_not_priced_like_a_cheap_list`.
+
+Observed spend on 2026-09-07: seeding 2008 units, proof scan 1253 units, ~3.3k of 10,000/day.
+
+### Constraint confirmed live — an unverified app cannot publish.
+
+`videos.insert` from this app uploads successfully but the video is forced to
+`privacyStatus: private`. Setting `public` in the request body does not override it. Making the
+five videos public therefore remains a manual step in YouTube Studio until the OAuth app passes
+Google's verification. This is the reason `scripts/seed_channel.md` exists at all.
