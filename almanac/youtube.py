@@ -235,19 +235,45 @@ def list_channel_videos(youtube=None, ledger: QuotaLedger | None = None) -> list
 
 # --------------------------------------------------------------------------------- captions
 
-def _english_track(items: list[dict]) -> dict | None:
-    """Prefer an uploaded English track over YouTube's machine transcription.
+def _track_kind(item: dict) -> str:
+    """trackKind, casefolded. The API returns 'asr'/'standard' in LOWERCASE."""
+    return str(item.get("snippet", {}).get("trackKind", "")).casefold()
 
-    trackKind 'ASR' is speech recognition. Almanac reads numbers off these captions and
-    decides whether a creator's figure is stale; a misheard "twenty-three thousand" would
-    become a fabricated claim attributed to the creator. Uploaded tracks only.
+
+def _is_uploaded(item: dict) -> bool:
+    """True only for a track a human uploaded.
+
+    A POSITIVE allowlist, not `!= "asr"`. The previous version tested
+    `trackKind != "ASR"` against an API that returns lowercase `asr`, so every machine
+    transcript passed the filter, and which track won came down to the order YouTube
+    happened to list them in — one video read correctly and three did not. A negative
+    filter fails open; this one fails closed.
     """
-    english = [i for i in items if i.get("snippet", {}).get("language", "").lower().startswith("en")]
-    standard = [i for i in english if i.get("snippet", {}).get("trackKind") != "ASR"]
-    if standard:
-        return standard[0]
-    non_asr = [i for i in items if i.get("snippet", {}).get("trackKind") != "ASR"]
-    return non_asr[0] if non_asr else None
+    return _track_kind(item) == "standard"
+
+
+def _english_track(items: list[dict]) -> dict | None:
+    """Pick the uploaded English caption track, never YouTube's machine transcription.
+
+    Almanac reads numbers off these captions and decides whether a creator's figure is
+    stale. An ASR mishearing of "twenty-three thousand" would become a fabricated claim
+    attributed to the creator, so a machine transcript is not a degraded source here — it is
+    the wrong source. If no uploaded track exists this returns None and the caller raises,
+    which is the correct outcome: no captions beats invented ones.
+
+    Selection is deterministic. Among equally valid tracks a named one wins, then the
+    lowest id, so the same channel always yields the same track rather than depending on
+    the order the API listed them.
+    """
+    uploaded = [i for i in items if _is_uploaded(i)]
+    english = [
+        i for i in uploaded
+        if str(i.get("snippet", {}).get("language", "")).casefold().startswith("en")
+    ]
+    pool = english or uploaded
+    if not pool:
+        return None
+    return sorted(pool, key=lambda i: (not i.get("snippet", {}).get("name"), i.get("id", "")))[0]
 
 
 def list_caption_tracks(video_id: str, youtube=None, ledger: QuotaLedger | None = None) -> list[dict]:
