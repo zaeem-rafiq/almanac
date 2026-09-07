@@ -17,6 +17,7 @@ decision unauditable, which is the one thing Almanac is built not to do.
 from __future__ import annotations
 
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -444,6 +445,76 @@ def _call_model(chunk_text: str, system_prompt: str, client, model: str) -> list
         return []
 
 
+# --- Coverage sweep (ADR-002 D-5) ------------------------------------------------------------
+#
+# Extraction is a model call and does not repeat itself: A-05 measured 65-77 verdicts on identical
+# input across five live runs, and the eval gate failed 2 in 5 because one `stale_material` claim
+# intermittently vanished — always the i-bond composite-rate sentence that sits beside the 2022
+# historical trap. A dropped live-rate sentence means a genuinely stale video goes uncorrected.
+#
+# The obvious fix — pin the sampling — is NOT AVAILABLE. Verified against the live API on
+# 2026-09-07: `temperature`, `top_p` and `top_k` all return 400 "deprecated for this model", and
+# `seed`/`random_seed` are rejected as extra inputs. ADR-000 §4 previously listed `temperature` as
+# supported; that was wrong and is corrected there.
+#
+# So determinism is not requested from the model — it is enforced in code, which is the same move
+# the rest of Almanac makes. A conservative sweep marks every sentence that certainly carries a
+# number (digits, or spelled-out numerals such as "three point one one percent"). Any marked
+# sentence the first pass produced no claim for is sent back for one more targeted look. The model
+# still reads; the code decides what counts as complete.
+
+_ONES = r"zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen"
+_TENS = r"twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety"
+_SCALE = r"hundred|thousand|million|billion"
+_UNIT = r"percent|dollars?|point|basis points?"
+_NUMWORD = rf"(?:{_ONES}|{_TENS}|{_SCALE})"
+
+_HAS_DIGIT = re.compile(r"\d")
+_NUMWORD_RUN = re.compile(rf"\b{_NUMWORD}\b[\s,-]+\b(?:{_NUMWORD}|{_UNIT})\b", re.I)
+_NUMWORD_UNIT = re.compile(rf"\b{_NUMWORD}\b(?:\W+\w+){{0,2}}\W+\b(?:{_UNIT})\b", re.I)
+_SENTENCE = re.compile(r"[^.!?]+[.!?]?")
+
+# One targeted re-read only. A sentence the model declines twice is a finding, not a retry loop.
+COVERAGE_PASSES = 1
+
+
+def carries_a_number(sentence: str) -> bool:
+    """True when a sentence certainly states a number, in digits or in words.
+
+    Deliberately conservative: it should never claim a sentence carries a number when it does not,
+    because every hit costs a second model call. Missing a borderline sentence only forfeits the
+    safety net for it; the first pass still had its chance.
+    """
+    return bool(
+        _HAS_DIGIT.search(sentence)
+        or _NUMWORD_RUN.search(sentence)
+        or _NUMWORD_UNIT.search(sentence)
+    )
+
+
+def number_bearing_spans(text: str) -> list[tuple[int, int]]:
+    """(start, end) of every sentence in `text` that carries a number."""
+    return [
+        (m.start(), m.end())
+        for m in _SENTENCE.finditer(text)
+        if m.group(0).strip() and carries_a_number(m.group(0))
+    ]
+
+
+def uncovered_sentences(text: str, claims: Iterable[Claim]) -> list[str]:
+    """Number-bearing sentences that no claim overlaps — what the first pass failed to read."""
+    covered: list[tuple[int, int]] = []
+    for claim in claims:
+        span = locate(text, claim.quote)
+        if span is not None:
+            covered.append(span)
+    missing = []
+    for start, end in number_bearing_spans(text):
+        if not any(cs < end and start < ce for cs, ce in covered):
+            missing.append(text[start:end].strip())
+    return missing
+
+
 @dataclass
 class ExtractionStats:
     """What the run did, so a caller can see drops rather than infer them from a short list."""
@@ -452,6 +523,9 @@ class ExtractionStats:
     dropped_unlocatable: int = 0
     dropped_duplicate: int = 0
     demoted_entity_key: int = 0
+    # Claims the first pass missed and the coverage sweep recovered. Non-zero here is the
+    # measurement of how often extraction under-reads; it should be reported, not hidden.
+    recovered_by_sweep: int = 0
 
 
 def _assemble(
@@ -541,7 +615,33 @@ def extract_sources(
 
     stats = ExtractionStats()
     by_source = {s.source_id: s for s in sources}
-    return {
+    assembled = {
         source_id: _assemble(by_source[source_id], raw, allowed, stats)
         for source_id, raw in results.items()
     }
+
+    # Coverage sweep: re-read only the number-bearing sentences the first pass produced no claim
+    # for. `_assemble` dedupes by span, so re-offering a sentence already covered is harmless.
+    for _ in range(COVERAGE_PASSES):
+        retry = {
+            source_id: uncovered_sentences(by_source[source_id].text, claims)
+            for source_id, claims in assembled.items()
+        }
+        retry = {sid: miss for sid, miss in retry.items() if miss}
+        if not retry:
+            break
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(retry))) as pool:
+            futures = {
+                sid: pool.submit(_call_model, "\n".join(miss), system_prompt, client, model)
+                for sid, miss in retry.items()
+            }
+            for sid, future in futures.items():
+                recovered = future.result()
+                stats.recovered_by_sweep += len(recovered)
+                results[sid].extend(recovered)
+        assembled = {
+            source_id: _assemble(by_source[source_id], raw, allowed, stats)
+            for source_id, raw in results.items()
+        }
+
+    return assembled
