@@ -393,3 +393,29 @@ def test_claim_model_enforces_the_shape_the_issue_specifies():
         Claim(source_id="s", locator="L1", quote="x", claim_type="other", confidence=1.4)
     with pytest.raises(Exception):
         Claim(source_id="s", locator="L1", quote="x", claim_type="not_a_type", confidence=0.5)
+
+
+# ------------------------------------------------------- the one-claim-per-number rule (D-2)
+
+
+def test_prompt_asks_for_one_claim_per_number_not_per_sentence():
+    """ADR-002 D-2: "One claim per sentence-with-a-number" is what merged multi-number sentences.
+
+    Pinned as a test because it is a prompt line with no other guard: nothing else in the suite
+    fails if it silently reverts, and its effect is only visible in a live run.
+    """
+    from almanac.extract import build_system_prompt
+
+    prompt = build_system_prompt()
+    assert "ONE CLAIM PER NUMBER" in prompt
+    assert "One claim per sentence-with-a-number" not in prompt, "the merging instruction is back"
+
+
+def test_prompt_tells_the_model_to_quote_the_clause_when_a_sentence_has_several_numbers():
+    """Without this, one-claim-per-number yields duplicate whole-sentence quotes that _assemble
+    dedupes by span — turning the fix into a no-op."""
+    from almanac.extract import build_system_prompt
+
+    prompt = build_system_prompt()
+    assert "quote the CLAUSE around the number" in prompt
+    assert "must not carry the same quote" in prompt

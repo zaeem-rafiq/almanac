@@ -1,0 +1,212 @@
+{
+  "run_at": "2026-09-07T22:01:13+00:00",
+  "gate": {
+    "passed": true,
+    "failures": [],
+    "hard_negative_fp_ceiling": 0,
+    "stale_material_recall_floor": 0.9
+  },
+  "run": {
+    "sources_read": [
+      "corpus/channel/v1-401k-limits-explained/captions.srt",
+      "corpus/channel/v2-mortgage-or-invest/captions.srt",
+      "corpus/channel/v3-hsa-triple-tax-advantage/captions.srt",
+      "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "corpus/channel/v5-ibonds-vs-high-yield-savings/captions.srt",
+      "corpus/scripts/fresh_ok.md",
+      "corpus/scripts/fresh_wrong.md"
+    ],
+    "verdicts_produced": 77,
+    "labelled_rows": 54,
+    "matched": 48,
+    "unmatched_labels": 6,
+    "unlocatable_labels": 0,
+    "unmatched_verdicts": 29,
+    "min_label_coverage": 0.9,
+    "sensitivity": {
+      "0.50": 49,
+      "0.70": 48,
+      "0.90": 48,
+      "1.00": 48
+    },
+    "extraction": "live"
+  },
+  "extraction_recall": 0.8888888888888888,
+  "claim_type": {
+    "accuracy": 0.9791666666666666,
+    "hits": 47,
+    "of": 48,
+    "confusion": [
+      {
+        "expected": "historical",
+        "got": "historical",
+        "n": 1
+      },
+      {
+        "expected": "illustrative",
+        "got": "illustrative",
+        "n": 20
+      },
+      {
+        "expected": "illustrative",
+        "got": "structural",
+        "n": 1
+      },
+      {
+        "expected": "market_rate",
+        "got": "market_rate",
+        "n": 4
+      },
+      {
+        "expected": "statutory_limit",
+        "got": "statutory_limit",
+        "n": 18
+      },
+      {
+        "expected": "structural",
+        "got": "structural",
+        "n": 4
+      }
+    ]
+  },
+  "status_scores": [
+    {
+      "status": "skip",
+      "precision": 1.0,
+      "recall": 0.8125,
+      "true_positives": 26,
+      "false_positives": 0,
+      "false_negatives": 6,
+      "support": 32,
+      "not_extracted": 6
+    },
+    {
+      "status": "correct",
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 9,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "support": 9,
+      "not_extracted": 0
+    },
+    {
+      "status": "stale_material",
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 7,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "support": 7,
+      "not_extracted": 0
+    },
+    {
+      "status": "stale_immaterial",
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 2,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "support": 2,
+      "not_extracted": 0
+    },
+    {
+      "status": "unresolved",
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 4,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "support": 4,
+      "not_extracted": 0
+    }
+  ],
+  "status_confusion": [
+    {
+      "expected": "correct",
+      "got": "correct",
+      "n": 9
+    },
+    {
+      "expected": "skip",
+      "got": "<not extracted>",
+      "n": 6
+    },
+    {
+      "expected": "skip",
+      "got": "skip",
+      "n": 26
+    },
+    {
+      "expected": "stale_immaterial",
+      "got": "stale_immaterial",
+      "n": 2
+    },
+    {
+      "expected": "stale_material",
+      "got": "stale_material",
+      "n": 7
+    },
+    {
+      "expected": "unresolved",
+      "got": "unresolved",
+      "n": 4
+    }
+  ],
+  "hard_negatives": {
+    "labelled": 28,
+    "matched": 22,
+    "false_positives": 0,
+    "claim_types": [
+      "historical",
+      "illustrative"
+    ],
+    "rows": [],
+    "stale_verdicts_outside_labelled_set": 0
+  },
+  "misses": [],
+  "not_extracted": [
+    {
+      "line": 5,
+      "source": "corpus/channel/v1-401k-limits-explained/captions.srt",
+      "quote": "Say you make seventy thousand dollars",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 12,
+      "source": "corpus/channel/v2-mortgage-or-invest/captions.srt",
+      "quote": "Say you have three hundred thousand dollars left on the loan",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 14,
+      "source": "corpus/channel/v2-mortgage-or-invest/captions.srt",
+      "quote": "an extra five hundred dollars a month you could throw at either side",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 25,
+      "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "quote": "Ten thousand dollars. It showed up, it is yours",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 27,
+      "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "quote": "you have no debt above eight percent",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 29,
+      "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "quote": "Whatever is left goes into three funds. Not thirty. Three.",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    }
+  ]
+}
