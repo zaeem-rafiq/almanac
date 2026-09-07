@@ -203,3 +203,46 @@ re-consenting as its owner produced a match on the first try.
 
 Comfortably covers the Tue Sep 8 07:00 America/Chicago deadline. If work continues past
 Sep 14, `rm token.json` and re-consent.
+
+---
+
+## 9. Correction to §5b / G-1c — the staleness is real, but the conclusion drawn from it was wrong
+
+Appended 2026-09-07 during A-01 planning.
+
+**What §5b got right:** FMP's `economic-indicators` really does return a ~9-month-old window on this
+key. Confirmed again, and `from_date`/`to_date` are **ignored** — passing
+`from_date=2026-06-01&to_date=2026-09-07` returns byte-identical rows to passing nothing.
+
+**What §5b got wrong:** it concluded A-01 should therefore *loosen* `max_age_days` per series. That
+is backwards. The right conclusion is that FMP's `economic-indicators` is **unusable** for Almanac,
+and the primary feeds should be read directly — which is exactly what HAC-37's fallback clause
+already authorises.
+
+Two facts force this:
+
+1. **`cpi_yoy` is not computable from FMP on this key.** The spec needs the latest month and the
+   same month one year earlier. FMP returns **2 CPI rows, two months apart**. There is no pair.
+2. **The issue's own `max_age_days` are tight** — mortgage 10 days, 10-year 5 days. Under a 9-month
+   lag every rate is permanently stale, so the product would ship perpetually self-flagged.
+
+**The four keyless primary feeds were tested and are current:**
+
+| key | feed | observed |
+|---|---|---|
+| `fed_funds_effective` | NY Fed EFFR JSON | 3.63 @ 2026-09-03 |
+| `mortgage_30y_fixed` | Freddie Mac `PMMS_history.csv` | 6.71 @ 2026-09-03 (2893 rows) |
+| `treasury_10y` | Treasury daily par yield XML `BC_10YEAR` | 4.78 @ 2026-09-04 |
+| `cpi_yoy` | BLS v1 `CUUR0000SA0` | 333.918 @ 2026-07, **33 months** of history |
+
+Two of these match Zaeem's independently-recorded 9/7 figures exactly (3.63, 6.71), while FMP does
+not — so the issue's "verified via FMP" note was in fact verified against the primary sources.
+
+**Consequence for the runtime contract: none.** `facts/rates.json` keeps its shape; only
+`fetched_via` changes from the hardcoded `"fmp"` to the actual fetcher per key (`nyfed`,
+`freddiemac`, `treasury`, `bls`). `catalog.refresh_rates()` remains the only function that reaches
+the network for rates, and every other module still reads `facts/rates.json` only.
+
+**Open question for Zaeem (non-blocking):** if a different/paid FMP key returns current
+`economic-indicators` rows, the original FMP path can be restored by swapping the key — the fetcher
+seam is per-key, so it is a contained change either way.

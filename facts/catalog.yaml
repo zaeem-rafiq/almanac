@@ -5,122 +5,229 @@
 #   treasurydirect.gov URL. The agent may scaffold entries with `value: null`;
 #   it may not fill values. Tests fail on null values and on URLs that don't return 200.
 #
-# Scaffolded in A-00 with every value null. Zaeem fills `value`, `source_url`,
-# `effective_from`, and `effective_to` in A-01, after which this file is protected.
-#
-# `source: rates` entries are populated by `python -m almanac rates --refresh`
-# (catalog.refresh_rates() -> facts/rates.json). Their `max_age_days` is derived in A-01
-# from the cadence observed by scripts/preflight.py, not assumed (see ADR-000 KTD3/5b).
+# ---------------------------------------------------------------------------
+# ZAEEM — fill the 11 `source: manual` entries below. For each one:
+#     value:          the 2026 figure
+#     effective_from: the date the 2026 figure took effect (usually 2026-01-01)
+#     source_url:     the irs.gov / ssa.gov / treasurydirect.gov page showing it
+#     history[0]:     the 2025 figure with its own effective_from / effective_to / source_url
+# Leave every `source: rates` entry alone — `python -m almanac rates --refresh` fills those.
+# ---------------------------------------------------------------------------
 
 entities:
-  # ---- source: rates (written by rates --refresh; never hand-edited) ----
-  - key: fed_funds
-    label: Federal funds rate
-    kind: rate
-    source: rates
-    value: null
-    unit: percent
-    effective_from: null
-    effective_to: null
-    source_url: null
-    max_age_days: null
-
-  - key: mortgage_30y
-    label: 30-year fixed mortgage average
-    kind: rate
-    source: rates
-    value: null
-    unit: percent
-    effective_from: null
-    effective_to: null
-    source_url: null
-    max_age_days: null
-
-  - key: cpi
-    label: Consumer Price Index (index level)
-    kind: index
-    source: rates
-    value: null
-    unit: index
-    effective_from: null
-    effective_to: null
-    source_url: null
-    max_age_days: null
-
-  - key: treasury_10y
-    label: 10-year Treasury yield
-    kind: rate
-    source: rates
-    value: null
-    unit: percent
-    effective_from: null
-    effective_to: null
-    source_url: null
-    max_age_days: null
-
-  # ---- source: manual (Zaeem supplies value + primary-source URL in A-01) ----
-  - key: contrib_401k_elective
-    label: 401(k) elective deferral limit
-    kind: limit
+  # ======================= source: manual (Zaeem fills) =======================
+  - key: k401_employee_deferral
+    label: 401(k) employee elective deferral limit
+    kind: statutory_limit
     source: manual
-    value: null
     unit: usd
+    value: null
     effective_from: null
     effective_to: null
     source_url: null
-    max_age_days: null
+    history:
+      - value: null
+        effective_from: null
+        effective_to: null
+        source_url: null
 
-  - key: contrib_ira
+  - key: k401_catchup_50plus
+    label: 401(k) catch-up contribution, age 50+
+    kind: statutory_limit
+    source: manual
+    unit: usd
+    value: null
+    effective_from: null
+    effective_to: null
+    source_url: null
+    history:
+      - value: null
+        effective_from: null
+        effective_to: null
+        source_url: null
+
+  - key: ira_contribution
     label: IRA contribution limit
-    kind: limit
+    kind: statutory_limit
     source: manual
-    value: null
     unit: usd
+    value: null
     effective_from: null
     effective_to: null
     source_url: null
-    max_age_days: null
+    history:
+      - value: null
+        effective_from: null
+        effective_to: null
+        source_url: null
 
-  - key: std_deduction_single
+  - key: ira_catchup_50plus
+    label: IRA catch-up contribution, age 50+
+    kind: statutory_limit
+    source: manual
+    unit: usd
+    value: null
+    effective_from: null
+    effective_to: null
+    source_url: null
+    history:
+      - value: null
+        effective_from: null
+        effective_to: null
+        source_url: null
+
+  - key: hsa_self_only
+    label: HSA contribution limit, self-only coverage
+    kind: statutory_limit
+    source: manual
+    unit: usd
+    value: null
+    effective_from: null
+    effective_to: null
+    source_url: null
+    history:
+      - value: null
+        effective_from: null
+        effective_to: null
+        source_url: null
+
+  - key: hsa_family
+    label: HSA contribution limit, family coverage
+    kind: statutory_limit
+    source: manual
+    unit: usd
+    value: null
+    effective_from: null
+    effective_to: null
+    source_url: null
+    history:
+      - value: null
+        effective_from: null
+        effective_to: null
+        source_url: null
+
+  - key: standard_deduction_single
     label: Standard deduction, single filer
-    kind: deduction
+    kind: statutory_limit
     source: manual
-    value: null
     unit: usd
+    value: null
     effective_from: null
     effective_to: null
     source_url: null
-    max_age_days: null
+    history:
+      - value: null
+        effective_from: null
+        effective_to: null
+        source_url: null
 
-  - key: std_deduction_mfj
+  - key: standard_deduction_mfj
     label: Standard deduction, married filing jointly
-    kind: deduction
+    kind: statutory_limit
     source: manual
-    value: null
     unit: usd
+    value: null
     effective_from: null
     effective_to: null
     source_url: null
-    max_age_days: null
+    history:
+      - value: null
+        effective_from: null
+        effective_to: null
+        source_url: null
 
   - key: ss_wage_base
     label: Social Security taxable wage base
-    kind: threshold
+    kind: statutory_limit
     source: manual
-    value: null
     unit: usd
+    value: null
     effective_from: null
     effective_to: null
     source_url: null
-    max_age_days: null
+    history:
+      - value: null
+        effective_from: null
+        effective_to: null
+        source_url: null
 
-  - key: hsa_contrib_self
-    label: HSA contribution limit, self-only coverage
-    kind: limit
+  - key: gift_annual_exclusion
+    label: Annual gift tax exclusion
+    kind: statutory_limit
     source: manual
-    value: null
     unit: usd
+    value: null
     effective_from: null
     effective_to: null
     source_url: null
-    max_age_days: null
+    history:
+      - value: null
+        effective_from: null
+        effective_to: null
+        source_url: null
+
+  - key: ibond_composite_rate
+    label: Series I savings bond composite rate
+    kind: market_rate
+    source: manual
+    unit: pct
+    value: null
+    effective_from: null
+    effective_to: null
+    source_url: null
+    history:
+      - value: null
+        effective_from: null
+        effective_to: null
+        source_url: null
+
+  # ============ source: rates (written by `rates --refresh` — do not hand-edit) ============
+  - key: fed_funds_effective
+    label: Effective federal funds rate
+    kind: market_rate
+    source: rates
+    unit: pct
+    value: null
+    effective_from: null
+    effective_to: null
+    source_url: https://www.newyorkfed.org/markets/reference-rates/effr
+    max_age_days: 45
+    history: []
+
+  - key: mortgage_30y_fixed
+    label: 30-year fixed-rate mortgage average
+    kind: market_rate
+    source: rates
+    unit: pct
+    value: null
+    effective_from: null
+    effective_to: null
+    source_url: https://www.freddiemac.com/pmms
+    max_age_days: 10
+    history: []
+
+  - key: treasury_10y
+    label: 10-year Treasury constant maturity yield
+    kind: market_rate
+    source: rates
+    unit: pct
+    value: null
+    effective_from: null
+    effective_to: null
+    source_url: https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve
+    max_age_days: 5
+    history: []
+
+  - key: cpi_yoy
+    label: CPI-U year-over-year inflation rate
+    kind: market_rate
+    source: rates
+    unit: pct
+    value: null
+    effective_from: null
+    effective_to: null
+    # www.bls.gov returns 403 to scripted clients; this is the series page for the exact
+    # series refresh_rates() reads (CUUR0000SA0), which is tighter provenance anyway.
+    source_url: https://data.bls.gov/timeseries/CUUR0000SA0
+    max_age_days: 45
+    history: []

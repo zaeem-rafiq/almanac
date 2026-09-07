@@ -63,6 +63,59 @@ def mask(value: str | None, keep: int = 6) -> str:
     return f"{value[:keep]}…(len {len(value)})"
 
 
+def _cmd_facts(_args) -> int:
+    """Print every key with its current value, as-of/effective date, and source.
+
+    Reads facts/catalog.yaml and facts/rates.json only. Makes no network call, and needs no
+    FMP_API_KEY — that is the runtime contract A-01 establishes.
+    """
+    from almanac.catalog import freshness_report
+
+    rows = freshness_report()
+    print(f"{'KEY':<28} {'VALUE':>12}  {'AS OF':<12} {'SOURCE':<8} NOTE")
+    print("-" * 88)
+    missing = 0
+    for row in rows:
+        value = "—" if row["value"] is None else f"{row['value']:,.2f}"
+        if row["value"] is None:
+            missing += 1
+        as_of = row["as_of"].isoformat() if row["as_of"] else "—"
+        note = row["note"] or ""
+        print(f"{row['key']:<28} {value:>12}  {as_of:<12} {row['source']:<8} {note}")
+    print("-" * 88)
+    stale = sum(1 for r in rows if r["stale"])
+    print(f"{len(rows)} keys · {missing} without a value · {stale} stale")
+    return 0
+
+
+def _cmd_rates(args) -> int:
+    """`rates --refresh` is the only command that reaches the network for rate data."""
+    from almanac.catalog import refresh_rates
+
+    if not args.refresh:
+        print("nothing to do: pass --refresh")
+        return 0
+    rows, failures = refresh_rates()
+    for key, row in sorted(rows.items()):
+        print(f"  {key:<24} {row.value:>10}  as_of={row.as_of}  via={row.fetched_via}")
+    for failure in failures:
+        print(f"  FAILED {failure}")
+    print(f"wrote {len(rows)} keys to facts/rates.json" + (f", {len(failures)} failed" if failures else ""))
+    return 1 if failures else 0
+
+
 def main(argv: list[str] | None = None) -> int:
-    """A-03+ fills this in: `rates --refresh`, `scan`, `report`, `apply`."""
-    raise SystemExit("almanac CLI is not implemented yet (scaffolded in A-00).")
+    import argparse
+
+    parser = argparse.ArgumentParser(prog="almanac", description="Almanac — checks the numbers.")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    facts = sub.add_parser("facts", help="print every fact with its value, date and source")
+    facts.set_defaults(func=_cmd_facts)
+
+    rates = sub.add_parser("rates", help="refresh facts/rates.json from the primary feeds")
+    rates.add_argument("--refresh", action="store_true", help="fetch and write the rates table")
+    rates.set_defaults(func=_cmd_rates)
+
+    args = parser.parse_args(argv)
+    return args.func(args)
