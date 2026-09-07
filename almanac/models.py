@@ -75,3 +75,41 @@ class Fact(BaseModel):
     stale: bool = False
     max_age_days: int | None = None
     age_days: int | None = None
+
+
+ClaimType = Literal[
+    "statutory_limit",
+    "tax_bracket",
+    "market_rate",
+    "illustrative",
+    "historical",
+    "other",
+]
+
+
+class Claim(BaseModel):
+    """One numeric assertion pulled out of a script or a caption track by extract.py.
+
+    A Claim says what a sentence *is*. It never says whether the sentence is right — that is
+    judge.py's job, and every verdict it produces carries a `rule_fired`. Nothing on this model
+    is a verdict, and nothing here may become one.
+
+    `source_id` and `locator` are assigned by code, never by the model: they are not in the
+    tool schema the model answers, so a hallucinated provenance is not expressible. `quote` is
+    the original slice recovered from the source text by offset, so it is verbatim by
+    construction rather than by promise.
+    """
+
+    source_id: str = Field(description="repo-relative path of the file the claim came from")
+    locator: str = Field(description="SRT start timestamp, or 'L<n>' for a script line")
+    quote: str = Field(max_length=200, description="verbatim substring of the source text")
+    claim_type: ClaimType
+    entity_key: str | None = Field(
+        default=None, description="a facts/catalog.yaml key, or None when nothing in the catalog fits"
+    )
+    value: float | None = None
+    unit: Unit | None = None
+    year_hint: int | None = Field(
+        default=None, description="the year the sentence names, when it names one"
+    )
+    confidence: float = Field(ge=0.0, le=1.0)
