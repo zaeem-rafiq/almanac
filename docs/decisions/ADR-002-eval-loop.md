@@ -376,3 +376,72 @@ Claude 5 family, and Almanac runs on `claude-opus-5`". `extract._client()` reads
 on a task whose failure mode is a semantic merge of two adjacent sentences — there is no evidence
 a weaker model merges them less often, and good reason to expect the opposite. Recorded so the
 option is visible and its cost is stated, not so it is taken.
+
+---
+
+## D-5 RESOLUTION — ratified, then unavailable, then superseded in code (`d314e9a`)
+
+**Status:** SUPERSEDED · **Fix applied:** rule/code — the coverage sweep in `almanac/extract.py`
+(`d314e9a`, on main), not a sampling parameter.
+
+D-5 has three stages and the entry above only records the first. In order:
+
+1. **Zaeem ratified D-5** and directed `temperature=0.0` in `extract._call_model`.
+2. **The fix proved unavailable.** Applied, it raised
+   `TypeError: Messages.create() got an unexpected keyword argument 'temperature'`; reverted
+   immediately, main never broken. Probed six ways against the live API: `temperature` kwarg →
+   TypeError; `extra_body={"temperature":0}` → 400 "deprecated for this model"; `top_p` → 400;
+   `top_k` → 400; `seed` and `random_seed` → 400 "Extra inputs are not permitted".
+   `OutputConfigParam` carries only `effort` and `format`. **No sampling route to determinism on
+   `claude-opus-5` through this SDK.**
+3. **Superseded by a code-side fix**, `d314e9a`: after the first pass, a conservative detector
+   marks every sentence that certainly states a number — digits *or* spelled out — and any marked
+   sentence with no claim gets one targeted re-read. One extra pass only;
+   `ExtractionStats.recovered_by_sweep` keeps under-reading visible.
+
+**D-5's cause was also wrong, and not through this branch's fault.** ADR-000 §4 listed
+`temperature` in the accepted-parameter set; it was never in the introspection that section was
+built from. The inference "no temperature passed, so it runs at the API default 1.0" was sound
+given that ADR. ADR-000 §10 records the correction. **D-5's measurement stands** — five runs, the
+always-same dropped row. Only the cause and the fix were wrong.
+
+### Independently re-verified here, not taken on report
+
+| claim | re-derived | result |
+|---|---|---|
+| detector flags 43/197 corpus sentences (22%) | `number_bearing_spans` over `corpus/channel` | **43/197 (22%) — exact match** |
+| the spelled-out i-bond sentence is caught | `carries_a_number("The composite rate right now is three point one one percent")` | **True**; a digit-only regex returns **False**, so the word-numeral branch is load-bearing |
+| suite still green | `pytest tests/ -q` | **244 passed** (this branch's 236 + the sweep's 8) |
+
+A first attempt at the detector figure gave 63/238 (26%) because it swept all 7 sources; the
+peer's figure is over `corpus/channel` alone. Same scope, same number.
+
+### The gate, 6 consecutive live runs post-sweep
+
+| | pre-sweep | post-sweep |
+|---|---|---|
+| gate PASS | **7 / 11** | **6 / 6** |
+| verdict range | 65–79 (spread 14) | 76–84 (spread 8) |
+| `stale_material` | 6 or 7 of 7 | **7/7 in every run** |
+| status disagreements | 0 | 0 |
+
+**How strong is 6/6?** Not as strong as it looks. Under the pre-sweep failure rate (4 in 11,
+p≈0.36), six consecutive passes would occur by chance about **7%** of the time. That is suggestive,
+not conclusive. A 12-run sample would have put it near 0.5%; **the run was cut short by the
+Anthropic credit balance being exhausted mid-sample** (400, "credit balance is too low"), so the
+stronger number is not yet in hand. Re-run `almanac eval` six more times when credits are restored
+before quoting a reliability figure in the README.
+
+### What must NOT be claimed
+
+The sweep does **not** make extraction deterministic, and `matched` still varied 45–48 across the
+six runs. What it stabilises is the *product-bearing* band: `stale_material` was 7/7 in all six.
+Residual variance sits in `skip`. Saying "extraction is now deterministic" on the README would be
+precisely the failure **D-6** warns about — a safeguard that reads stronger than it measures.
+
+### Note on the other decisions
+
+The peer message lists D-1..D-4 and D-6 as still awaiting. **D-7 is also still awaiting** — it was
+added after that message was drafted. Six decisions remain unratified: D-1, D-2, D-3, D-4, D-6, D-7.
+
+`evals/results.md` on disk is from a **pre-sweep** run and should be regenerated once credits allow.
