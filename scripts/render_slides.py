@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -38,6 +39,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+from almanac.cli import load_env  # noqa: E402
 
 CORPUS = ROOT / "corpus" / "channel"
 OUT_DIR = ROOT / "renders"
@@ -63,6 +66,24 @@ DURATION_TOLERANCE = 2.0        # video vs caption-track end, asserted after enc
 # the previous build shipped an anullsrc track that measured -91.0 dB, i.e. digital silence
 # that merely EXISTED. Anything quieter than this is treated as a failed mux, not as audio.
 NARRATION_VOICE = "Samantha"
+
+# --- Google Cloud Text-to-Speech (optional, opt-in via --engine google) ------------------
+# Verified against the REST reference on 2026-09-07:
+#   POST https://texttospeech.googleapis.com/v1/text:synthesize
+#   body {input:{text}, voice:{languageCode,name}, audioConfig:{audioEncoding,speakingRate,...}}
+#   response {"audioContent": "<base64>"}  — for LINEAR16 the bytes INCLUDE the WAV header,
+#   so the decoded payload is a playable .wav with no conversion step.
+# speakingRate is 0.25-4.0; sampleRateHertz 8000-48000.
+#
+# No new package: this is a plain `requests` POST, and `requests` is already a dependency.
+# The key is read from the environment and never printed.
+GOOGLE_TTS_ENDPOINT = "https://texttospeech.googleapis.com/v1/text:synthesize"
+GOOGLE_TTS_VOICES_ENDPOINT = "https://texttospeech.googleapis.com/v1/voices"
+GOOGLE_TTS_KEY_VAR = "GOOGLE_TTS_API_KEY"
+# Studio voices are Google's long-form narration voices and are the most natural of the set.
+GOOGLE_TTS_VOICE = "en-US-Studio-O"
+GOOGLE_TTS_LANGUAGE = "en-US"
+GOOGLE_TTS_SAMPLE_RATE = 44100
 SILENCE_FLOOR_DB = -50.0
 # atempo only ever speeds narration up to fit its cue slot, and only within ffmpeg's range.
 ATEMPO_MIN, ATEMPO_MAX = 1.0, 2.0
@@ -341,7 +362,79 @@ def _voice_available(voice: str) -> bool:
     return any(line.split()[:1] == [voice] for line in result.stdout.splitlines())
 
 
-def synthesize_narration(cues: list, work: Path, slug: str) -> tuple[Path, float]:
+def google_api_key() -> str:
+    key = os.environ.get(GOOGLE_TTS_KEY_VAR, "").strip()
+    if not key:
+        raise RuntimeError(
+            f"{GOOGLE_TTS_KEY_VAR} is not set. Add it to .env, then re-run. "
+            "Enable the Cloud Text-to-Speech API and create a key in the same Google Cloud "
+            "project as the OAuth client (almanac-hackathon-507916)."
+        )
+    return key
+
+
+def list_google_voices(language: str = GOOGLE_TTS_LANGUAGE) -> list[dict]:
+    """Ask the API which voices exist, rather than trusting a name from documentation."""
+    import requests
+
+    response = requests.get(
+        GOOGLE_TTS_VOICES_ENDPOINT,
+        params={"key": google_api_key(), "languageCode": language},
+        timeout=30,
+    )
+    if response.status_code != 200:
+        raise RuntimeError(f"voices.list HTTP {response.status_code}: {response.text[:300]}")
+    return response.json().get("voices", [])
+
+
+def google_tts(text: str, out_path: Path, voice: str) -> None:
+    """Synthesize one cue to a WAV via the REST endpoint.
+
+    LINEAR16 is requested because its base64 payload already carries a WAV header, so the
+    decoded bytes are a playable file — one less conversion, and one less place to lose audio.
+    """
+    import base64
+
+    import requests
+
+    response = requests.post(
+        GOOGLE_TTS_ENDPOINT,
+        params={"key": google_api_key()},
+        json={
+            "input": {"text": text},
+            "voice": {"languageCode": GOOGLE_TTS_LANGUAGE, "name": voice},
+            "audioConfig": {
+                "audioEncoding": "LINEAR16",
+                "sampleRateHertz": GOOGLE_TTS_SAMPLE_RATE,
+            },
+        },
+        timeout=60,
+    )
+    if response.status_code != 200:
+        # The body carries Google's own reason (API not enabled, key restricted, billing off).
+        # Surfacing it verbatim is the difference between a fix and a guess.
+        raise RuntimeError(f"text:synthesize HTTP {response.status_code}: {response.text[:400]}")
+    audio = response.json().get("audioContent")
+    if not audio:
+        raise RuntimeError("text:synthesize returned no audioContent")
+    out_path.write_bytes(base64.b64decode(audio))
+
+
+def synthesize_cue(text: str, out_path: Path, engine: str, voice: str | None) -> None:
+    """One cue of speech, from whichever engine was selected."""
+    if engine == "google":
+        google_tts(text or " ", out_path, voice or GOOGLE_TTS_VOICE)
+        return
+    command = ["say"]
+    if voice:
+        command += ["-v", voice]
+    command += ["-o", str(out_path), text or " "]
+    _run(command)
+
+
+def synthesize_narration(
+    cues: list, work: Path, slug: str, engine: str = "say", voice: str | None = None
+) -> tuple[Path, float]:
     """Speak each cue and lay it in that cue's own slot, so audio and subtitles stay locked.
 
     Synthesising the whole script in one `say` call would be simpler and wrong: its natural
@@ -353,18 +446,16 @@ def synthesize_narration(cues: list, work: Path, slug: str) -> tuple[Path, float
     2x, which is ffmpeg's per-filter limit); where it is short the slot is padded with
     silence, which keeps the natural pace and reads as a pause between sentences.
     """
-    voice = NARRATION_VOICE if _voice_available(NARRATION_VOICE) else None
+    if engine == "say" and voice is None:
+        voice = NARRATION_VOICE if _voice_available(NARRATION_VOICE) else None
+    suffix = ".wav" if engine == "google" else ".aiff"
     slots = cue_slots(cues)
 
     segments: list[Path] = []
     for i, cue in enumerate(cues):
         text = to_ascii(" ".join(cue.content.split()))
-        segment = work / f"{slug}-cue{i:03d}.aiff"
-        command = ["say"]
-        if voice:
-            command += ["-v", voice]
-        command += ["-o", str(segment), text or " "]
-        _run(command)
+        segment = work / f"{slug}-cue{i:03d}{suffix}"
+        synthesize_cue(text, segment, engine, voice)
         segments.append(segment)
 
     filters, labels = [], []
@@ -481,7 +572,8 @@ def encode(pngs: list[tuple[Path, float]], audio: Path, total: float, out_path: 
     list_path.unlink(missing_ok=True)
 
 
-def render_video(slug: str, meta: dict, srt_path: Path, out_dir: Path, work: Path) -> dict:
+def render_video(slug: str, meta: dict, srt_path: Path, out_dir: Path, work: Path,
+                 engine: str = "say", voice: str | None = None) -> dict:
     cues = caption_cues(srt_path)
     if not cues:
         raise RuntimeError(f"{slug}: caption file parsed to zero cues")
@@ -491,7 +583,7 @@ def render_video(slug: str, meta: dict, srt_path: Path, out_dir: Path, work: Pat
     if len(bullets) != 3:
         raise RuntimeError(f"{slug}: expected 3 bullets, selected {len(bullets)}")
 
-    narration, narration_seconds = synthesize_narration(cues, work, slug)
+    narration, narration_seconds = synthesize_narration(cues, work, slug, engine, voice)
 
     cards = [title_card(meta["title"], meta.get("published_at", ""))]
     cards += [bullet_card(i, len(bullets), text) for i, (text, _) in enumerate(bullets, start=1)]
@@ -545,12 +637,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Render corpus videos to upload-ready slideshows.")
     parser.add_argument("--out", default=str(OUT_DIR), help="output directory")
     parser.add_argument("--only", help="render a single corpus slug")
+    parser.add_argument("--engine", choices=("say", "google"), default="say",
+                        help="narration engine: macOS `say` (default) or Google Cloud TTS")
+    parser.add_argument("--voice", help="voice name; defaults per engine")
+    parser.add_argument("--list-voices", action="store_true",
+                        help="print the Google TTS voices the API actually offers, and exit")
     args = parser.parse_args(argv)
+    load_env()
 
     for tool in ("sips", "ffmpeg", "ffprobe"):
         if shutil.which(tool) is None:
             print(f"missing required tool: {tool}", file=sys.stderr)
             return 2
+
+    if args.list_voices:
+        for v in sorted(list_google_voices(), key=lambda x: x["name"]):
+            print(f"  {v['name']:<26} {v.get('ssmlGender',''):<7} {v.get('naturalSampleRateHertz','')}")
+        return 0
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -567,7 +670,9 @@ def main(argv: list[str] | None = None) -> int:
     results = []
     for slug in slugs:
         meta = json.loads((CORPUS / slug / "meta.json").read_text(encoding="utf-8"))
-        results.append(render_video(slug, meta, CORPUS / slug / "captions.srt", out_dir, work))
+        results.append(render_video(
+            slug, meta, CORPUS / slug / "captions.srt", out_dir, work, args.engine, args.voice
+        ))
 
     header = f"{'FILE':<38} {'VIDEO':>8} {'CAPTIONS':>9} {'DRIFT':>7} {'AUDIO':>9} {'RES':>10} {'MB':>6}"
     print(header)
