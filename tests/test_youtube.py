@@ -323,7 +323,7 @@ def test_cosmetic_recue_stays_under_the_threshold(sandbox):
 def test_download_captions_decodes_the_bytes_adr_000_documented():
     """ADR-000 §3: supportsMediaDownload: True means execute() returns bytes, not a dict."""
     fake = FakeYouTube(
-        captions=[{"id": "cap1", "snippet": {"language": "en", "trackKind": "standard"}}],
+        captions=[{"id": "cap1", "snippet": {"language": "en", "trackKind": "standard", "name": "English"}}],
         caption_bodies={"cap1": SRT_ONE.encode("utf-8")},
     )
     text = yt.download_captions("vid1", fake, yt.QuotaLedger(), wait=False)
@@ -335,9 +335,51 @@ def test_machine_transcription_is_never_preferred_over_an_uploaded_track():
     """An ASR mishearing would become a fabricated claim attributed to the creator."""
     track = yt._english_track([
         {"id": "asr", "snippet": {"language": "en", "trackKind": "ASR"}},
-        {"id": "real", "snippet": {"language": "en", "trackKind": "standard"}},
+        {"id": "real", "snippet": {"language": "en", "trackKind": "standard", "name": "English"}},
     ])
     assert track["id"] == "real"
+
+
+@pytest.mark.parametrize("kind", ["asr", "ASR", "Asr", "aSr"])
+def test_asr_is_rejected_whatever_case_the_api_uses(kind):
+    """REGRESSION. The API returns lowercase 'asr'; the filter compared against 'ASR'.
+
+    Every machine transcript therefore passed the filter, and the live proof went red only
+    once YouTube had finished generating ASR tracks — hours after the code was written and
+    'verified'. Pinned in all four casings so the comparison can never silently flip back.
+    """
+    assert not yt._is_uploaded({"snippet": {"trackKind": kind}})
+    assert yt._is_uploaded({"snippet": {"trackKind": "standard"}})
+
+
+@pytest.mark.parametrize("asr_first", [True, False])
+def test_track_choice_does_not_depend_on_the_order_the_api_lists_them(asr_first):
+    """The bug picked whichever track came first, so it passed on some videos and not others.
+
+    That is the worst shape a defect can have — it looks like flakiness, not a bug.
+    """
+    asr = {"id": "aaa-asr", "snippet": {"language": "en", "trackKind": "asr", "name": ""}}
+    real = {"id": "zzz-real", "snippet": {"language": "en", "trackKind": "standard", "name": "English"}}
+    items = [asr, real] if asr_first else [real, asr]
+    assert yt._english_track(items)["id"] == "zzz-real"
+
+
+def test_a_video_with_only_machine_captions_yields_nothing_rather_than_asr():
+    """No captions beats invented ones — the caller raises, which is the right outcome."""
+    assert yt._english_track([{"id": "asr", "snippet": {"language": "en", "trackKind": "asr"}}]) is None
+
+    fake = FakeYouTube(captions=[{"id": "asr", "snippet": {"language": "en", "trackKind": "asr"}}])
+    with pytest.raises(yt.YouTubeError, match="no uploaded English caption track"):
+        yt.download_captions("vid1", fake, yt.QuotaLedger(), wait=False)
+
+
+def test_track_selection_is_deterministic_among_equal_candidates():
+    items = [
+        {"id": "b", "snippet": {"language": "en", "trackKind": "standard", "name": ""}},
+        {"id": "a", "snippet": {"language": "en", "trackKind": "standard", "name": "English"}},
+    ]
+    assert yt._english_track(items)["id"] == "a"          # named wins
+    assert yt._english_track(list(reversed(items)))["id"] == "a"  # regardless of order
 
 
 def test_a_missing_caption_track_is_an_error_not_an_empty_string():
@@ -355,7 +397,7 @@ def test_wait_for_caption_track_retries_before_giving_up():
         calls["n"] += 1
         if calls["n"] >= 2:
             fake.captions_payload = [
-                {"id": "cap1", "snippet": {"language": "en", "trackKind": "standard"}}
+                {"id": "cap1", "snippet": {"language": "en", "trackKind": "standard", "name": "English"}}
             ]
 
     track = yt.wait_for_caption_track(
@@ -397,7 +439,7 @@ def test_corpus_and_youtube_sources_are_the_same_shape(sandbox):
              "contentDetails": {"duration": "PT30S", "caption": "true"}}
             for v in videos
         ]},
-        captions=[{"id": "cap1", "snippet": {"language": "en", "trackKind": "standard"}}],
+        captions=[{"id": "cap1", "snippet": {"language": "en", "trackKind": "standard", "name": "English"}}],
         caption_bodies={"cap1": SRT_ONE.encode("utf-8")},
     )
 
