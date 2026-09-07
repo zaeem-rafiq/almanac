@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -422,20 +423,75 @@ def _client():
     return anthropic.Anthropic(api_key=api_key), os.environ.get("LLM_MODEL", "claude-opus-5")
 
 
-def _call_model(chunk_text: str, system_prompt: str, client, model: str) -> list[ExtractedClaim]:
-    """One tool-use round trip. Call shape verified in ADR-000 §4 / scripts/preflight.py."""
-    message = client.messages.create(
-        model=model,
-        max_tokens=MAX_TOKENS,
-        system=system_prompt,
-        tools=[{
+# --- Cost controls -----------------------------------------------------------------------------
+#
+# Three levers, applied on Zaeem's instruction 2026-09-07 after the account ran out of credit.
+# None of them changes WHAT the model is asked. The prompt, the tool schema, the forced tool
+# choice and the parsing are byte-identical to what shipped; only the billing changes.
+#
+# 1. PROMPT CACHING. Every call re-sent the same ~1,900-token prefix at full price — the system
+#    prompt (1,358 tok) + the tool schema (538 tok) — on every call of every run ever made. The
+#    breakpoint sits at the END of `system`, so the cached prefix is tools + system (render order
+#    is tools -> system -> messages) and the per-chunk text falls after it. Opus 5's minimum
+#    cacheable prefix is 512 tokens, so this prefix qualifies.
+#
+#    NOT the top-level `cache_control` auto-breakpoint: that caches the LAST cacheable block,
+#    which here is the chunk text. Every chunk differs, so each call would write a fresh entry
+#    and none would ever read one — paying the 1.25x write premium for nothing.
+#
+# 2. EFFORT. Opus 5 runs adaptive thinking BY DEFAULT at effort `high` when `thinking` is omitted
+#    (unlike Opus 4.7/4.8), and thinking bills as OUTPUT at 5x the input rate. Extraction is a
+#    labelling task that was silently paying for deep reasoning nobody asked for.
+#
+#    Thinking is deliberately NOT disabled. On Opus 5, `thinking: {type: "disabled"}` can make the
+#    model write a tool call into visible TEXT instead of a tool_use block — the turn succeeds, the
+#    call never runs, and nothing raises. For a forced-tool-use extractor that failure is silent
+#    and total, so the cheaper-and-safe lever is low effort, not no thinking.
+#
+# 3. BATCH. Opt-in via `scan --batch`: 50% off, asynchronous. Never the default and never used by
+#    `lint` or the web endpoint, which have to answer while a human waits.
+#
+# UNVERIFIED AGAINST THE LIVE API. The credit balance is exhausted, so none of this has been
+# measured end to end — `count_tokens` is refused too. The request SHAPE is asserted offline in
+# tests/test_extract_cost.py; the savings are arithmetic, not observation. Confirm with
+# `usage.cache_read_input_tokens` on the first paid run.
+
+EXTRACT_EFFORT = "low"
+CACHE_CONTROL = {"type": "ephemeral"}   # 5-minute TTL; a read refreshes the timer for free
+BATCH_POLL_SECONDS = 5
+BATCH_TIMEOUT_SECONDS = 3_600
+
+
+def _request_params(chunk_text: str, system_prompt: str, model: str) -> dict:
+    """The exact request body, built in ONE place.
+
+    The synchronous path and the batch path both build their request here, so a batched scan
+    cannot drift from an interactive one: the two differ in transport and price, never in what
+    the model is asked.
+    """
+    return {
+        "model": model,
+        "max_tokens": MAX_TOKENS,
+        # A list of blocks, not a bare string: `cache_control` is a content-block field, and this
+        # block is the last thing in the cached prefix.
+        "system": [{
+            "type": "text",
+            "text": system_prompt,
+            "cache_control": dict(CACHE_CONTROL),
+        }],
+        "output_config": {"effort": EXTRACT_EFFORT},
+        "tools": [{
             "name": TOOL_NAME,
             "description": "Record every sentence that contains a number, with its label.",
             "input_schema": Extraction.model_json_schema(),
         }],
-        tool_choice={"type": "tool", "name": TOOL_NAME},
-        messages=[{"role": "user", "content": chunk_text}],
-    )
+        "tool_choice": {"type": "tool", "name": TOOL_NAME},
+        "messages": [{"role": "user", "content": chunk_text}],
+    }
+
+
+def _claims_from_message(message) -> list[ExtractedClaim]:
+    """Read the tool-use block. Unchanged behaviour; lifted out so the batch path shares it."""
     blocks = [b for b in message.content if getattr(b, "type", None) == "tool_use"]
     if not blocks:
         return []
@@ -443,6 +499,98 @@ def _call_model(chunk_text: str, system_prompt: str, client, model: str) -> list
         return Extraction.model_validate(blocks[0].input).claims
     except ValidationError:
         return []
+
+
+def _call_model(chunk_text: str, system_prompt: str, client, model: str) -> list[ExtractedClaim]:
+    """One tool-use round trip. Call shape verified in ADR-000 §4 / scripts/preflight.py."""
+    return _claims_from_message(
+        client.messages.create(**_request_params(chunk_text, system_prompt, model))
+    )
+
+
+def _call_model_batch(
+    chunk_texts: dict[str, str],
+    system_prompt: str,
+    client,
+    model: str,
+    poll_seconds: float = BATCH_POLL_SECONDS,
+    timeout_seconds: float = BATCH_TIMEOUT_SECONDS,
+) -> dict[str, list[ExtractedClaim]]:
+    """Run every extraction call as one Message Batch — 50% off, asynchronous.
+
+    Results come back in ANY order, so they are keyed by `custom_id` and never by position. A
+    request that errored yields no claims for its key rather than failing the whole run: the
+    coverage sweep already exists to notice sentences nothing was produced for.
+    """
+    from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
+    from anthropic.types.messages.batch_create_params import Request
+
+    if not chunk_texts:
+        return {}
+
+    # The caller's keys are internal job ids, but custom_id has to survive the round trip, so the
+    # mapping is explicit rather than assuming the keys are id-safe.
+    ids = {f"job{index}": key for index, key in enumerate(chunk_texts)}
+    batch = client.messages.batches.create(requests=[
+        Request(
+            custom_id=custom_id,
+            params=MessageCreateParamsNonStreaming(
+                **_request_params(chunk_texts[key], system_prompt, model)
+            ),
+        )
+        for custom_id, key in ids.items()
+    ])
+
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        status = client.messages.batches.retrieve(batch.id)
+        if status.processing_status == "ended":
+            break
+        if time.monotonic() > deadline:
+            raise TimeoutError(
+                f"batch {batch.id} still {status.processing_status} after {timeout_seconds}s"
+            )
+        time.sleep(poll_seconds)
+
+    out: dict[str, list[ExtractedClaim]] = {key: [] for key in chunk_texts}
+    for result in client.messages.batches.results(batch.id):
+        key = ids.get(result.custom_id)
+        if key is not None and result.result.type == "succeeded":
+            out[key] = _claims_from_message(result.result.message)
+    return out
+
+
+def _run_jobs(
+    jobs: list[tuple[str, str]], system_prompt: str, client, model: str,
+    max_workers: int, batch: bool,
+) -> dict[str, list[ExtractedClaim]]:
+    """Run `(job_key, chunk_text)` jobs and return `{job_key: claims}`.
+
+    The synchronous path warms the cache ON PURPOSE: the first call runs ALONE so it writes the
+    shared prefix, and only then do the rest fan out and read it. Firing all of them at once
+    would have every in-flight call miss simultaneously and pay the 1.25x write premium — caching
+    would then cost MORE than not caching at all. One serialized call turns N writes into
+    1 write + (N-1) reads, at the price of one call's latency.
+    """
+    if not jobs:
+        return {}
+    if batch:
+        return _call_model_batch(dict(jobs), system_prompt, client, model)
+
+    first_key, first_text = jobs[0]
+    out: dict[str, list[ExtractedClaim]] = {
+        first_key: _call_model(first_text, system_prompt, client, model)
+    }
+    rest = jobs[1:]
+    if rest:
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(rest))) as pool:
+            futures = [
+                (key, pool.submit(_call_model, text, system_prompt, client, model))
+                for key, text in rest
+            ]
+            for key, future in futures:
+                out[key] = future.result()
+    return out
 
 
 # --- Coverage sweep (ADR-002 D-5) ------------------------------------------------------------
@@ -584,7 +732,7 @@ def extract(text: str, source_id: str, locators: list) -> list[Claim]:
 
 
 def extract_sources(
-    sources: list[Source], max_workers: int = MAX_CONCURRENCY
+    sources: list[Source], max_workers: int = MAX_CONCURRENCY, batch: bool = False
 ) -> dict[str, list[Claim]]:
     """Extract from several sources at once, sharing one bounded pool.
 
@@ -598,20 +746,19 @@ def extract_sources(
     system_prompt = build_system_prompt()
     client, model = _client()
 
-    jobs: list[tuple[Source, str]] = []
+    # (job_key, source_id, chunk_text). A source may hold several chunks, so each job carries its
+    # own key and the results are folded back per source — never matched by position.
+    jobs: list[tuple[str, str, str]] = []
     for source in sources:
         for _, chunk_text in chunk(source):
-            jobs.append((source, chunk_text))
+            jobs.append((f"read{len(jobs)}", source.source_id, chunk_text))
 
     results: dict[str, list[ExtractedClaim]] = {s.source_id: [] for s in sources}
-    if jobs:
-        with ThreadPoolExecutor(max_workers=min(max_workers, len(jobs))) as pool:
-            futures = [
-                (source, pool.submit(_call_model, chunk_text, system_prompt, client, model))
-                for source, chunk_text in jobs
-            ]
-            for source, future in futures:
-                results[source.source_id].extend(future.result())
+    produced = _run_jobs(
+        [(key, text) for key, _, text in jobs], system_prompt, client, model, max_workers, batch
+    )
+    for key, source_id, _ in jobs:
+        results[source_id].extend(produced.get(key, []))
 
     stats = ExtractionStats()
     by_source = {s.source_id: s for s in sources}
@@ -630,15 +777,18 @@ def extract_sources(
         retry = {sid: miss for sid, miss in retry.items() if miss}
         if not retry:
             break
-        with ThreadPoolExecutor(max_workers=min(max_workers, len(retry))) as pool:
-            futures = {
-                sid: pool.submit(_call_model, "\n".join(miss), system_prompt, client, model)
-                for sid, miss in retry.items()
-            }
-            for sid, future in futures.items():
-                recovered = future.result()
-                stats.recovered_by_sweep += len(recovered)
-                results[sid].extend(recovered)
+        sweep_jobs = [
+            (f"sweep{index}", source_id, "\n".join(miss))
+            for index, (source_id, miss) in enumerate(retry.items())
+        ]
+        produced = _run_jobs(
+            [(key, text) for key, _, text in sweep_jobs],
+            system_prompt, client, model, max_workers, batch,
+        )
+        for key, source_id, _ in sweep_jobs:
+            recovered = produced.get(key, [])
+            stats.recovered_by_sweep += len(recovered)
+            results[source_id].extend(recovered)
         assembled = {
             source_id: _assemble(by_source[source_id], raw, allowed, stats)
             for source_id, raw in results.items()

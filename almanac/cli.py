@@ -223,7 +223,7 @@ def _shown(path):
         return Path(path).resolve()
 
 
-def _judged(sources, draft_notes: bool):
+def _judged(sources, draft_notes: bool, batch: bool = False):
     """extract -> judge -> (optionally) notes. The only order this pipeline may run in.
 
     The model labels (extract), then the code decides (judge), then the model phrases what the code
@@ -234,7 +234,7 @@ def _judged(sources, draft_notes: bool):
     from almanac.judge import judge_all
     from almanac.notes import annotate
 
-    by_source = extract_sources(sources)
+    by_source = extract_sources(sources, batch=batch)
     judged = {sid: judge_all(claims) for sid, claims in by_source.items()}
     notes = {}
     if draft_notes:
@@ -303,7 +303,7 @@ def _cmd_scan(args) -> int:
             )
             return 2
 
-    judged, notes = _judged(sources, draft_notes=not args.no_notes)
+    judged, notes = _judged(sources, draft_notes=not args.no_notes, batch=args.batch)
     report = build_report(args.source, judged, notes)
     json_path, md_path = write_report(report, args.out)
 
@@ -365,6 +365,11 @@ def main(argv: list[str] | None = None) -> int:
     scan.add_argument("--out", default=None, help="output directory (default: reports/)")
     scan.add_argument("--target", default=None, help="override the corpus directory to scan")
     scan.add_argument("--no-notes", action="store_true", help="skip drafting update notes")
+    scan.add_argument(
+        "--batch", action="store_true",
+        help="extract via the Message Batches API: 50%% cheaper, asynchronous (minutes, not "
+             "seconds). A back catalogue is not latency-sensitive; `lint` never uses this.",
+    )
     scan.set_defaults(func=_cmd_scan)
 
     lint = sub.add_parser("lint", help="judge one script or caption file")
