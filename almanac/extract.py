@@ -34,7 +34,17 @@ CHARS_PER_TOKEN = 4
 CHUNK_TOKENS = 2_000
 CHUNK_CHARS = CHUNK_TOKENS * CHARS_PER_TOKEN
 MAX_CONCURRENCY = 4
-MAX_TOKENS = 4_096
+# Must cover THINKING PLUS the answer. thinking_level=HIGH spent 3,931 tokens on one 2.9k-char
+# chunk, leaving 151 of a 4,096 budget for output — the JSON truncated mid-object and four of
+# five videos silently extracted nothing. Measured, not guessed.
+MAX_TOKENS = 24_576
+# Fixed so a re-run reproduces a run. Available on Vertex; deprecated on claude-opus-5.
+EXTRACTION_SEED = 20260908
+# thinking_level="HIGH" is UNBOUNDED in practice: it expanded to consume whatever max_output_tokens
+# allowed (3,931 of 4,096; then 23,592 of 24,576) and truncated the answer every time. An explicit
+# budget caps thinking and leaves room for output. Measured on one v1 chunk: budget=4096 ->
+# thoughts=3,980, output=1,703, finish=STOP, 20 claims in 30s.
+THINKING_BUDGET = 4_096
 
 
 class Locator(NamedTuple):
@@ -410,39 +420,79 @@ def _admit_entity_key(proposed: str | None, allowed: set[str]) -> str | None:
 # ------------------------------------------------------------------------------- the model call
 
 
+# Vertex AI, not the Anthropic API. Zaeem has Google Cloud credits and the Anthropic balance is
+# exhausted. The project is passed EXPLICITLY and `gcloud config set project` is never called, so
+# this cannot reach any other project of his by accident — the isolation is structural, not careful.
+DEFAULT_PROJECT = "polygraph-hackathon"
+DEFAULT_LOCATION = "global"
+DEFAULT_MODEL = "gemini-3.8-flash"
+
+
 def _client():
-    import anthropic
+    """A Vertex AI client bound to one explicit project, plus the model id to call.
+
+    Credentials come from Application Default Credentials (`gcloud auth application-default
+    login`). No API key is read or stored for this path.
+    """
+    from google import genai
 
     from almanac.cli import load_env
 
     load_env()
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set — see .env")
-    return anthropic.Anthropic(api_key=api_key), os.environ.get("LLM_MODEL", "claude-opus-5")
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT", DEFAULT_PROJECT)
+    location = os.environ.get("GOOGLE_CLOUD_LOCATION", DEFAULT_LOCATION)
+    model = os.environ.get("LLM_MODEL", DEFAULT_MODEL)
+    return genai.Client(vertexai=True, project=project, location=location), model
 
 
 def _call_model(chunk_text: str, system_prompt: str, client, model: str) -> list[ExtractedClaim]:
     """One tool-use round trip. Call shape verified in ADR-000 §4 / scripts/preflight.py."""
-    message = client.messages.create(
+    from google.genai import types
+
+    # `response_schema` takes the Pydantic class itself, so `Extraction` carries over from the
+    # Anthropic tool-use shape unchanged — the schema, the prompt and the claim model are the same.
+    #
+    # temperature=0.0 and a fixed seed are BOTH available here, unlike on claude-opus-5 where every
+    # sampling parameter is deprecated (ADR-000 §10). This is the determinism ADR-002 D-5 asked for
+    # and could not have. The coverage sweep below stays as a second line of defence: a pinned
+    # sample is still a sample, and the sweep checks completeness rather than trusting it.
+    response = client.models.generate_content(
         model=model,
-        max_tokens=MAX_TOKENS,
-        system=system_prompt,
-        tools=[{
-            "name": TOOL_NAME,
-            "description": "Record every sentence that contains a number, with its label.",
-            "input_schema": Extraction.model_json_schema(),
-        }],
-        tool_choice={"type": "tool", "name": TOOL_NAME},
-        messages=[{"role": "user", "content": chunk_text}],
+        contents=chunk_text,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            response_mime_type="application/json",
+            response_schema=Extraction,
+            temperature=0.0,
+            seed=EXTRACTION_SEED,
+            max_output_tokens=MAX_TOKENS,
+            thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET),
+        ),
     )
-    blocks = [b for b in message.content if getattr(b, "type", None) == "tool_use"]
-    if not blocks:
-        return []
-    try:
-        return Extraction.model_validate(blocks[0].input).claims
-    except ValidationError:
-        return []
+    parsed = getattr(response, "parsed", None)
+    if isinstance(parsed, Extraction):
+        return parsed.claims
+
+    # Everything below is a FAILED chunk. Say so loudly: an empty list here is indistinguishable
+    # from "this transcript had no numbers in it", and that is exactly how a truncated response
+    # silently dropped four whole videos once.
+    candidate = (getattr(response, "candidates", None) or [None])[0]
+    reason = getattr(candidate, "finish_reason", None)
+    usage = getattr(response, "usage_metadata", None)
+    detail = f"finish_reason={reason}"
+    if usage is not None:
+        detail += (f" thoughts={getattr(usage, 'thoughts_token_count', None)}"
+                   f" candidates={usage.candidates_token_count}")
+    text = (getattr(response, "text", None) or "").strip()
+    if text:
+        try:
+            return Extraction.model_validate_json(text).claims
+        except ValidationError:
+            pass
+    raise ExtractionFailed(
+        f"the model returned no usable claims for a chunk ({detail}); "
+        f"{len(text)} chars of unparseable text"
+    )
 
 
 # --- Coverage sweep (ADR-002 D-5) ------------------------------------------------------------
@@ -513,6 +563,11 @@ def uncovered_sentences(text: str, claims: Iterable[Claim]) -> list[str]:
         if not any(cs < end and start < ce for cs, ce in covered):
             missing.append(text[start:end].strip())
     return missing
+
+
+class ExtractionFailed(RuntimeError):
+    """A chunk produced nothing usable. Raised rather than returned as an empty list, because a
+    silent empty result reads as 'no numbers here' and hides a truncated or rejected response."""
 
 
 @dataclass
