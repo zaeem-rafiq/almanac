@@ -56,6 +56,29 @@ def test_manual_entries_have_source_url_and_effective_from():
     assert not incomplete, f"manual entries missing source_url/effective_from: {sorted(incomplete)}"
 
 
+def test_no_null_history_values():
+    """The Project Rules say tests fail on null values. `test_no_null_values` only reaches the
+    top-level value via `current(key)`, so a scaffolded HISTORY row was invisible to it.
+
+    Found by A-03 finding F-2a: an ibond_composite_rate row for the 2022 window the v5 video
+    cites was scaffolded with `value: null`, and the suite stayed green. A history row with no
+    value is a fact that judge.py can find but cannot use, which is worse than an absent row —
+    it looks like a covering window and answers nothing. Red until Zaeem fills it, exactly as
+    `test_no_null_values` is red until the manual entries are filled; that is the point.
+    """
+    missing = []
+    for key, entry in load_catalog().items():
+        for i, row in enumerate(entry.history):
+            if row.value is None:
+                window = f"{row.effective_from} -> {row.effective_to}"
+                missing.append(f"{key}[history][{i}] ({window})")
+    assert not missing, (
+        f"{len(missing)} history row(s) have no value: {missing}. "
+        "Manual values are supplied by Zaeem from irs.gov / ssa.gov / treasurydirect.gov; "
+        "the agent scaffolds the window and the source_url but never fills the number."
+    )
+
+
 def test_manual_entries_carry_history():
     for entry in load_catalog().values():
         if entry.source == "manual":
