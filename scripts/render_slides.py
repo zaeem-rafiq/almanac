@@ -45,10 +45,27 @@ OUT_DIR = ROOT / "renders"
 WIDTH, HEIGHT = 1280, 720
 MARGIN = 96
 
-# Duration budget. 4 cards, 6s + 3x8s = 30s, comfortably inside the issue's 20-60s window.
-TITLE_SECONDS = 6.0
-BULLET_SECONDS = 8.0
-MIN_TOTAL, MAX_TOTAL = 20.0, 60.0
+# DURATION: each video runs exactly as long as its own caption track.
+#
+# This deliberately overrides HAC-42's "20-60s slideshow" guidance, and the override is the
+# point rather than drift. The corpus caption files run 159-168s (53-56 cues at a 3s cadence).
+# A 30s video carrying a 162s caption track hides ~80% of its own subtitles and cuts off
+# mid-sentence — a judge clicking through from the review page sees something visibly broken,
+# which is the opposite of what the corpus was written to demonstrate. The 20-60s bound
+# existed to keep rendering cheap, not because 30s is correct.
+#
+# Zaeem's call, recorded in docs/proofs/A-06.md and the A-06 walkthrough.
+MIN_CARD_SECONDS = 6.0          # no card flashes past unread
+DURATION_TOLERANCE = 2.0        # video vs caption-track end, asserted after encoding
+
+# Narration is synthesized with the macOS built-in `say`. Text-to-speech, not a recording:
+# no human time, no new dependency, nothing installed. Silence would be worse than useless —
+# the previous build shipped an anullsrc track that measured -91.0 dB, i.e. digital silence
+# that merely EXISTED. Anything quieter than this is treated as a failed mux, not as audio.
+NARRATION_VOICE = "Samantha"
+SILENCE_FLOOR_DB = -50.0
+# atempo only ever speeds narration up to fit its cue slot, and only within ffmpeg's range.
+ATEMPO_MIN, ATEMPO_MAX = 1.0, 2.0
 
 # Flat palette. Deliberately generic — no channel branding exists and none is invented.
 INK = (0.965, 0.969, 0.976)
@@ -188,27 +205,63 @@ NUMERAL = re.compile(r"\d")
 SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 
-def caption_sentences(srt_path: Path) -> list[str]:
-    """Flatten an SRT into sentences, preserving order.
-
-    Uses the `srt` library rather than a hand-rolled parser — it is already a project
-    dependency and the corpus files are the same ones the API will hand back.
-    """
+def caption_cues(srt_path: Path) -> list:
+    """Parse the caption file with the `srt` library — the same parser A-02 used."""
     import srt as srt_lib
 
-    subtitles = list(srt_lib.parse(srt_path.read_text(encoding="utf-8")))
-    joined = " ".join(sub.content.replace("\n", " ").strip() for sub in subtitles)
-    joined = re.sub(r"\s+", " ", joined)
-    return [s.strip() for s in SENTENCE_SPLIT.split(joined) if s.strip()]
+    return list(srt_lib.parse(srt_path.read_text(encoding="utf-8")))
 
 
-def pick_bullets(sentences: list[str], count: int = 3, max_chars: int = 150) -> list[str]:
-    """Pick `count` numeric sentences spread across the runtime.
+def cue_slots(cues: list) -> list[tuple[float, float]]:
+    """Slot each cue occupies on the timeline: its own start to the NEXT cue's start.
 
-    Almanac exists to check numbers, so a card that carries no number is a wasted card.
-    Sampling at even positions stops all three bullets coming from the intro.
+    Using the next start rather than the cue's own end means the slots tile the timeline with
+    no gaps, so concatenating one audio segment per slot reproduces the caption timing exactly
+    instead of accumulating drift across 55 cues.
     """
-    numeric = [s for s in sentences if NUMERAL.search(s)]
+    slots = []
+    for i, cue in enumerate(cues):
+        start = cue.start.total_seconds()
+        end = cues[i + 1].start.total_seconds() if i + 1 < len(cues) else cue.end.total_seconds()
+        slots.append((start, max(end - start, 0.1)))
+    return slots
+
+
+def sentences_with_times(cues: list) -> list[tuple[str, float]]:
+    """Rebuild sentences from cue text, each tagged with the time it starts being spoken.
+
+    The timing is what lets a bullet card appear exactly when the narration reaches it, rather
+    than on an arbitrary fixed schedule.
+    """
+    sentences: list[tuple[str, float]] = []
+    buffer, start = "", 0.0
+    for cue in cues:
+        content = " ".join(cue.content.split())
+        if not content:
+            continue
+        if not buffer:
+            start = cue.start.total_seconds()
+        buffer = f"{buffer} {content}".strip()
+        while True:
+            match = re.search(r"[.!?](\s|$)", buffer)
+            if not match:
+                break
+            sentences.append((buffer[: match.end()].strip(), start))
+            buffer = buffer[match.end():].strip()
+            start = cue.end.total_seconds()
+    if buffer:
+        sentences.append((buffer, start))
+    return sentences
+
+
+def pick_bullets(sentences: list[tuple[str, float]], count: int = 3,
+                 max_chars: int = 150) -> list[tuple[str, float]]:
+    """Pick `count` numeric sentences spread across the runtime, keeping their start times.
+
+    Almanac exists to check numbers, so a card carrying no number is a wasted card. Sampling
+    at even positions stops all three bullets coming from the intro.
+    """
+    numeric = [item for item in sentences if NUMERAL.search(item[0])]
     pool = numeric if len(numeric) >= count else sentences
     if not pool:
         return []
@@ -219,11 +272,11 @@ def pick_bullets(sentences: list[str], count: int = 3, max_chars: int = 150) -> 
         chosen = [pool[min(int(i * step), len(pool) - 1)] for i in range(count)]
 
     bullets = []
-    for sentence in chosen:
-        clean = to_ascii(sentence).strip()
+    for text, start in chosen:
+        clean = to_ascii(text).strip()
         if len(clean) > max_chars:
             clean = clean[:max_chars].rsplit(" ", 1)[0] + "..."
-        bullets.append(clean)
+        bullets.append((clean, start))
     return bullets
 
 
@@ -258,6 +311,96 @@ def bullet_card(index: int, total: int, body: str) -> Card:
     card.rect(MARGIN, 140, WIDTH - 2 * MARGIN, 2, RULE)
     card.text(MARGIN, 96, "almanac - synthetic demo corpus", 22, DIM, bold=False)
     return card
+
+
+def card_schedule(bullet_times: list[float], total: float, card_count: int) -> list[float]:
+    """Card durations, so each bullet appears when the narration reaches it.
+
+    Boundaries are pushed forward monotonically to keep every card on screen at least
+    MIN_CARD_SECONDS — the first numeric sentence is often the opening line, which would
+    otherwise give the title card zero duration. If honouring that would run past the end of
+    the audio, the schedule falls back to even division rather than emitting a negative
+    duration.
+    """
+    bounds = [0.0]
+    for time in bullet_times:
+        bounds.append(max(time, bounds[-1] + MIN_CARD_SECONDS))
+    if bounds[-1] + MIN_CARD_SECONDS > total:
+        step = total / card_count
+        bounds = [i * step for i in range(card_count)]
+    bounds.append(total)
+    return [bounds[i + 1] - bounds[i] for i in range(len(bounds) - 1)]
+
+
+# --------------------------------------------------------------------------------------
+# Narration — macOS `say`, one segment per cue, placed on the caption timeline
+# --------------------------------------------------------------------------------------
+
+def _voice_available(voice: str) -> bool:
+    result = subprocess.run(["say", "-v", "?"], capture_output=True, text=True)
+    return any(line.split()[:1] == [voice] for line in result.stdout.splitlines())
+
+
+def synthesize_narration(cues: list, work: Path, slug: str) -> tuple[Path, float]:
+    """Speak each cue and lay it in that cue's own slot, so audio and subtitles stay locked.
+
+    Synthesising the whole script in one `say` call would be simpler and wrong: its natural
+    duration is whatever it is, and the caption file's timings are fixed, so the two would
+    drift apart within a few sentences. Per-cue synthesis makes alignment structural — each
+    cue's speech starts exactly where its subtitle starts.
+
+    Where speech overruns its slot it is sped up with `atempo` (never slowed, and never past
+    2x, which is ffmpeg's per-filter limit); where it is short the slot is padded with
+    silence, which keeps the natural pace and reads as a pause between sentences.
+    """
+    voice = NARRATION_VOICE if _voice_available(NARRATION_VOICE) else None
+    slots = cue_slots(cues)
+
+    segments: list[Path] = []
+    for i, cue in enumerate(cues):
+        text = to_ascii(" ".join(cue.content.split()))
+        segment = work / f"{slug}-cue{i:03d}.aiff"
+        command = ["say"]
+        if voice:
+            command += ["-v", voice]
+        command += ["-o", str(segment), text or " "]
+        _run(command)
+        segments.append(segment)
+
+    filters, labels = [], []
+    for i, (segment, (_, slot)) in enumerate(zip(segments, slots)):
+        spoken = probe_duration(segment)
+        tempo = min(max(spoken / slot, ATEMPO_MIN), ATEMPO_MAX) if slot > 0 else ATEMPO_MIN
+        filters.append(
+            f"[{i}:a]atempo={tempo:.4f},aresample=44100,apad,"
+            f"atrim=0:{slot:.4f},asetpts=N/SR/TB[a{i}]"
+        )
+        labels.append(f"[a{i}]")
+    filters.append("".join(labels) + f"concat=n={len(segments)}:v=0:a=1[out]")
+
+    narration = work / f"{slug}-narration.wav"
+    command = ["ffmpeg", "-y", "-loglevel", "error"]
+    for segment in segments:
+        command += ["-i", str(segment)]
+    command += ["-filter_complex", ";".join(filters), "-map", "[out]",
+                "-ar", "44100", "-ac", "2", str(narration)]
+    _run(command)
+
+    for segment in segments:
+        segment.unlink(missing_ok=True)
+    return narration, probe_duration(narration)
+
+
+def mean_volume_db(path: Path) -> float:
+    """Read mean_volume from ffmpeg's volumedetect. Digital silence reports -91.0 dB."""
+    result = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-i", str(path), "-af", "volumedetect", "-f", "null", "-"],
+        capture_output=True, text=True,
+    )
+    match = re.search(r"mean_volume:\s*(-?[\d.]+) dB", result.stderr)
+    if not match:
+        raise RuntimeError(f"volumedetect produced no mean_volume for {path.name}")
+    return float(match.group(1))
 
 
 # --------------------------------------------------------------------------------------
@@ -298,18 +441,25 @@ def probe_resolution(path: Path) -> str:
     return result.stdout.strip()
 
 
-def encode(pngs: list[tuple[Path, float]], out_path: Path) -> None:
-    """Sequence stills into H.264 with a silent stereo track.
+def encode(pngs: list[tuple[Path, float]], audio: Path, total: float, out_path: Path) -> None:
+    """Sequence stills into H.264 over the synthesized narration.
 
-    The concat demuxer needs the final image repeated without a duration, otherwise its
-    last segment is dropped. A silent AAC track is included because a video with no audio
-    stream at all is a common source of YouTube processing oddities.
+    Two ffmpeg behaviours have to be handled together, and the duration assertion in
+    `render_video` caught what happens when only one of them is:
+
+    * the concat demuxer drops the final segment unless the last image is repeated, and
+    * that repeated entry INHERITS the preceding `duration` rather than getting none, which
+      silently appended a phantom 51s to the first build (212.8s of video against a 161.8s
+      caption track).
+
+    So the repeat stays, and the output length is pinned with `-t` instead. `-shortest` is
+    deliberately not used: it would trim to whichever stream happened to come out shorter and
+    hide exactly the drift this function exists to preserve.
     """
-    total = sum(seconds for _, seconds in pngs)
     listing = []
     for png, seconds in pngs:
         listing.append(f"file '{png.as_posix()}'")
-        listing.append(f"duration {seconds}")
+        listing.append(f"duration {seconds:.4f}")
     listing.append(f"file '{pngs[-1][0].as_posix()}'")
 
     list_path = out_path.parent / f"{out_path.stem}.concat.txt"
@@ -318,13 +468,13 @@ def encode(pngs: list[tuple[Path, float]], out_path: Path) -> None:
     _run([
         "ffmpeg", "-y", "-loglevel", "error",
         "-f", "concat", "-safe", "0", "-i", str(list_path),
-        "-f", "lavfi", "-t", f"{total:.2f}",
-        "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "20",
+        "-i", str(audio),
+        "-c:v", "libx264", "-preset", "medium", "-crf", "22",
         "-pix_fmt", "yuv420p", "-r", "30",
         "-vf", f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease,"
                f"pad={WIDTH}:{HEIGHT}:(ow-iw)/2:(oh-ih)/2,format=yuv420p",
-        "-c:a", "aac", "-b:a", "96k", "-shortest",
+        "-c:a", "aac", "-b:a", "128k",
+        "-t", f"{total:.4f}",
         "-movflags", "+faststart",
         str(out_path),
     ])
@@ -332,39 +482,61 @@ def encode(pngs: list[tuple[Path, float]], out_path: Path) -> None:
 
 
 def render_video(slug: str, meta: dict, srt_path: Path, out_dir: Path, work: Path) -> dict:
-    bullets = pick_bullets(caption_sentences(srt_path))
+    cues = caption_cues(srt_path)
+    if not cues:
+        raise RuntimeError(f"{slug}: caption file parsed to zero cues")
+    captions_end = cues[-1].end.total_seconds()
+
+    bullets = pick_bullets(sentences_with_times(cues))
     if len(bullets) != 3:
         raise RuntimeError(f"{slug}: expected 3 bullets, selected {len(bullets)}")
 
-    cards: list[tuple[Card, float]] = [
-        (title_card(meta["title"], meta.get("published_at", "")), TITLE_SECONDS)
-    ]
-    for i, bullet in enumerate(bullets, start=1):
-        cards.append((bullet_card(i, len(bullets), bullet), BULLET_SECONDS))
+    narration, narration_seconds = synthesize_narration(cues, work, slug)
+
+    cards = [title_card(meta["title"], meta.get("published_at", ""))]
+    cards += [bullet_card(i, len(bullets), text) for i, (text, _) in enumerate(bullets, start=1)]
+    durations = card_schedule([start for _, start in bullets], narration_seconds, len(cards))
 
     stills: list[tuple[Path, float]] = []
-    for i, (card, seconds) in enumerate(cards):
+    for i, (card, seconds) in enumerate(zip(cards, durations)):
         pdf_path = work / f"{slug}-{i:02d}.pdf"
         png_path = work / f"{slug}-{i:02d}.png"
         rasterise(card, pdf_path, png_path)
         stills.append((png_path, seconds))
 
     out_path = out_dir / f"{slug}.mp4"
-    encode(stills, out_path)
+    encode(stills, narration, narration_seconds, out_path)
 
+    # ---- verification, measured rather than assumed -------------------------------------
     duration = probe_duration(out_path)
     resolution = probe_resolution(out_path)
-    if not MIN_TOTAL <= duration <= MAX_TOTAL:
-        raise RuntimeError(f"{slug}: {duration:.1f}s is outside the {MIN_TOTAL}-{MAX_TOTAL}s window")
+    volume = mean_volume_db(out_path)
+    drift = abs(duration - captions_end)
+
     if resolution != f"{WIDTH}x{HEIGHT}":
         raise RuntimeError(f"{slug}: resolution {resolution} != {WIDTH}x{HEIGHT}")
+    if drift > DURATION_TOLERANCE:
+        raise RuntimeError(
+            f"{slug}: video is {duration:.1f}s but its captions end at {captions_end:.1f}s "
+            f"({drift:.1f}s adrift, tolerance {DURATION_TOLERANCE}s) — subtitles would run "
+            "past the end of the video"
+        )
+    if volume <= SILENCE_FLOOR_DB:
+        raise RuntimeError(
+            f"{slug}: audio measures {volume:.1f} dB, at or below the {SILENCE_FLOOR_DB} dB "
+            "silence floor. A track that merely EXISTS is what shipped last time; this is a "
+            "failed narration mux, not audio."
+        )
 
     return {
         "slug": slug,
         "path": out_path,
         "duration": duration,
+        "captions_end": captions_end,
+        "drift": drift,
         "resolution": resolution,
-        "bullets": bullets,
+        "volume_db": volume,
+        "bullets": [text for text, _ in bullets],
         "size_mb": out_path.stat().st_size / 1e6,
     }
 
@@ -397,15 +569,23 @@ def main(argv: list[str] | None = None) -> int:
         meta = json.loads((CORPUS / slug / "meta.json").read_text(encoding="utf-8"))
         results.append(render_video(slug, meta, CORPUS / slug / "captions.srt", out_dir, work))
 
-    print(f"{'FILE':<40} {'DUR':>7} {'RES':>10} {'MB':>6}")
-    print("-" * 68)
+    header = f"{'FILE':<38} {'VIDEO':>8} {'CAPTIONS':>9} {'DRIFT':>7} {'AUDIO':>9} {'RES':>10} {'MB':>6}"
+    print(header)
+    print("-" * len(header))
     for row in results:
         print(
-            f"{row['path'].name:<40} {row['duration']:>6.1f}s "
-            f"{row['resolution']:>10} {row['size_mb']:>6.2f}"
+            f"{row['path'].name:<38} {row['duration']:>7.1f}s {row['captions_end']:>8.1f}s "
+            f"{row['drift']:>6.2f}s {row['volume_db']:>8.1f}dB {row['resolution']:>10} "
+            f"{row['size_mb']:>6.2f}"
         )
-    print("-" * 68)
-    print(f"{len(results)} video(s) in {out_dir}/ — every one inside {MIN_TOTAL:.0f}-{MAX_TOTAL:.0f}s at {WIDTH}x{HEIGHT}")
+    print("-" * len(header))
+    worst_drift = max(row["drift"] for row in results)
+    quietest = max(row["volume_db"] for row in results)
+    print(
+        f"{len(results)} video(s) in {out_dir}/ · every one at {WIDTH}x{HEIGHT}, "
+        f"worst caption drift {worst_drift:.2f}s (tolerance {DURATION_TOLERANCE}s), "
+        f"loudest-quiet {quietest:.1f}dB (floor {SILENCE_FLOOR_DB}dB)"
+    )
     return 0
 
 

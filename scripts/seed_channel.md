@@ -19,8 +19,11 @@ Nothing in this issue calls `videos.update`. There is no write path to review.
 - Sign in as the **`almanac` Brand Account** (channel `UCb0N54LdHk-10KgrL4n3LIA`), not your
   personal Google account. Picking the personal account is what cost A-00 two failed
   attempts. Check the avatar in the top-right of Studio before uploading anything.
-- The five rendered MP4s are in **`renders/`** at the repo root. Each is 30 s, 1280x720,
-  under 0.2 MB.
+- The five rendered MP4s are in **`renders/`** at the repo root. Each is 1280x720 with
+  synthesized narration, and runs the full length of its own caption track (~2m40s), so the
+  subtitles you attach line up end to end with what is being said. A few MB each.
+- **If you already downloaded an earlier 30-second set, discard it and use these.** The 30s
+  cut carried a 160s caption track, so ~80% of the subtitles fell past the end of the video.
 - Each video's caption file is the `captions.srt` already sitting in its corpus folder.
 
 ## The click-path, once per video
@@ -161,8 +164,8 @@ after its retry window, give it five more minutes and re-run before treating it 
 - **"Select files" is greyed out / no Create button** — you are on youtube.com, not
   studio.youtube.com, or the account has no channel. Re-check the avatar.
 - **Subtitles section missing** — the video language is not set. Go back to step 7.
-- **Upload stuck in processing** — a 30 s 1280x720 file processes in well under a minute.
-  If it hangs past five, re-upload that one file; do not re-do the others.
+- **Upload stuck in processing** — a ~2m40s 1280x720 file processes in a minute or two. If it
+  hangs past five, re-upload that one file; do not re-do the others.
 - **You picked the wrong account** — delete the uploads from that channel, switch account,
   start over. Do not leave them up: any channel other than `ALMANAC_TEST_CHANNEL_ID` is a
   protected path for this project and must not be touched by Almanac.
