@@ -124,17 +124,42 @@ def test_freshness_report_covers_every_key():
 # --------------------------------------------------------------- runtime makes no network call
 
 def test_runtime_reads_rates_json_and_never_calls_the_network(monkeypatch):
-    """PROOF A-01 #4: with FMP_API_KEY unset, resolution works and nothing goes out."""
+    """PROOF A-01 #4: with FMP_API_KEY unset, resolution works and nothing goes out.
+
+    Blocks at the SOCKET layer, not at requests.get — patching one function leaves
+    requests.Session, urllib, and httpx wide open, which a review agent proved by smuggling a
+    live call past the old version of this test.
+    """
+    import socket
+
     monkeypatch.delenv("FMP_API_KEY", raising=False)
 
     def explode(*a, **k):
-        raise AssertionError(f"runtime made a network call: {a[:1]}")
+        raise AssertionError(f"runtime opened a socket: {a[:1]}")
 
+    monkeypatch.setattr(socket.socket, "connect", explode)
+    monkeypatch.setattr(socket, "create_connection", explode)
     monkeypatch.setattr(requests, "get", explode)
-    monkeypatch.setattr(catalog.requests, "get", explode)
+
     report = freshness_report()
     assert len(report) >= 14
-    assert os.environ.get("FMP_API_KEY") is None
+
+    # ...and prove the rates half actually resolved FROM facts/rates.json, rather than passing
+    # vacuously because load_rates returned {} for a missing file.
+    resolved = {r["key"]: r for r in report if r["source"] == "rates"}
+    assert set(resolved) == REQUIRED_RATES
+    assert all(r["value"] is not None and r["as_of"] is not None for r in resolved.values()), (
+        f"rates did not resolve from facts/rates.json: {resolved}"
+    )
+
+
+def test_missing_rates_json_is_not_silently_treated_as_success(monkeypatch, tmp_path):
+    """The previous version of the test above passed with facts/rates.json deleted."""
+    monkeypatch.setattr(catalog, "RATES_PATH", tmp_path / "absent.json")
+    monkeypatch.setattr(catalog, "load_rates", lambda *a, **k: {})
+    fact = current("treasury_10y")
+    assert fact.value is None
+    assert fact.stale is True, "an unresolvable rate must be flagged, not pass as fresh"
 
 
 def test_no_module_but_catalog_calls_the_rate_feeds():
@@ -142,13 +167,20 @@ def test_no_module_but_catalog_calls_the_rate_feeds():
     from pathlib import Path
 
     pkg = Path(catalog.__file__).parent
+    markers = (
+        "requests.", "from requests import", "urllib.request", "urlopen", "httpx", "aiohttp",
+        "http.client", "socket.socket", "create_connection", "financialmodelingprep",
+    )
     offenders = []
-    for py in pkg.glob("*.py"):
-        if py.name in {"catalog.py"}:
+    for root in (pkg, pkg.parent / "web"):
+        if not root.is_dir():
             continue
-        text = py.read_text()
-        if "requests.get" in text or "financialmodelingprep" in text:
-            offenders.append(py.name)
+        for py in root.rglob("*.py"):
+            if py.name == "catalog.py" or "__pycache__" in py.parts:
+                continue
+            hits = [m for m in markers if m in py.read_text()]
+            if hits:
+                offenders.append(f"{py.relative_to(pkg.parent)}: {hits}")
     assert not offenders, f"modules other than catalog.py reach the network: {offenders}"
 
 
@@ -174,3 +206,56 @@ def test_every_source_url_returns_200():
         except Exception as exc:
             bad.append(f"{key}: {url} -> {type(exc).__name__}")
     assert not bad, "URLs that did not return 200:\n  " + "\n  ".join(bad)
+
+
+# ------------------------------------------------------- regressions from the A-01 code review
+
+def test_expired_manual_window_is_flagged_not_served_as_current(monkeypatch):
+    """A window that closed in the past must not resolve as the live fact.
+
+    Found by review: `effective_to` was exempting an entry from the age check instead of
+    expiring it, so a 2025 limit read as the current 2026 one with stale=False.
+    """
+    entry = CatalogEntry(
+        key="k401_employee_deferral", label="t", kind="statutory_limit", source="manual",
+        unit="usd", value=23500.0, effective_from=date(2025, 1, 1),
+        effective_to=date(2025, 12, 31), source_url="https://www.irs.gov/",
+    )
+    monkeypatch.setattr(catalog, "load_catalog", lambda *a, **k: {entry.key: entry})
+    fact = current(entry.key, today=date(2026, 9, 7))
+    assert fact.stale is True, "a window closed in 2025 must not read as the 2026 fact"
+    assert fact.value == 23500.0, "rule 4: annotate, never suppress"
+
+
+def test_open_window_with_future_effective_to_is_not_stale(monkeypatch):
+    entry = CatalogEntry(
+        key="ira_contribution", label="t", kind="statutory_limit", source="manual", unit="usd",
+        value=7500.0, effective_from=date(2026, 1, 1), effective_to=date(2026, 12, 31),
+        source_url="https://www.irs.gov/",
+    )
+    monkeypatch.setattr(catalog, "load_catalog", lambda *a, **k: {entry.key: entry})
+    assert current(entry.key, today=date(2026, 9, 7)).stale is False
+
+
+def test_cpi_yoy_ignores_bls_annual_average_row(monkeypatch):
+    """M13 is BLS's annual average. It sorts after M12 as a string and has no calendar month."""
+    payload = {
+        "status": "REQUEST_SUCCEEDED",
+        "Results": {"series": [{"data": [
+            {"year": "2026", "period": "M13", "periodName": "Annual", "value": "330.0"},
+            {"year": "2026", "period": "M12", "periodName": "December", "value": "336.0"},
+            {"year": "2025", "period": "M13", "periodName": "Annual", "value": "320.0"},
+            {"year": "2025", "period": "M12", "periodName": "December", "value": "328.0"},
+        ]}]},
+    }
+
+    class FakeResponse:
+        def json(self):
+            return payload
+
+    monkeypatch.setattr(catalog, "_get", lambda *a, **k: FakeResponse())
+    value, as_of, via, detail = catalog._fetch_cpi_yoy()
+    assert as_of == date(2026, 12, 1), "must pick December, not the annual average"
+    assert value == round((336.0 / 328.0 - 1) * 100, 2)
+    assert via == "bls"
+    assert "M12" in detail

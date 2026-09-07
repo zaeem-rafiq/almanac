@@ -81,10 +81,16 @@ def current(key: str, today: date | None = None) -> Fact:
     entry = catalog[key]
 
     if entry.source == "manual":
-        age = _age_days(entry.effective_from, today)
-        stale = (
+        now = today or datetime.now(timezone.utc).date()
+        age = _age_days(entry.effective_from, now)
+        # An entry whose window has CLOSED is expired: serving a 2025 limit as the live 2026 fact
+        # is precisely the error Almanac exists to catch. `effective_to` must expire the value,
+        # not exempt it from the age check. Rule 4 still holds — the value is returned, annotated.
+        expired = entry.effective_to is not None and entry.effective_to < now
+        never_closed_and_old = (
             entry.effective_to is None and age is not None and age > MANUAL_MAX_AGE_DAYS
         )
+        stale = expired or never_closed_and_old
         return Fact(
             key=entry.key, label=entry.label, value=entry.value, unit=entry.unit,
             as_of=entry.effective_from, resolved_from="manual", source_url=entry.source_url,
@@ -174,7 +180,13 @@ def _fetch_cpi_yoy() -> tuple[float, date, str, str]:
     if d.get("status") != "REQUEST_SUCCEEDED":
         raise RuntimeError(f"BLS status={d.get('status')} {d.get('message')}")
     series = d["Results"]["series"][0]["data"]
-    monthly = [r for r in series if r["period"].startswith("M")]
+    # BLS emits M13 (annual average) for every completed year. It sorts after M12 as a string
+    # and has no calendar month, so leaving it in both picks the wrong observation and makes
+    # date(year, 13, 1) raise every January once the prior year's average publishes.
+    monthly = [
+        r for r in series
+        if r["period"].startswith("M") and int(r["period"][1:]) <= 12
+    ]
     latest = max(monthly, key=lambda r: (int(r["year"]), r["period"]))
     prior = next(
         (r for r in monthly
