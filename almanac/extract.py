@@ -372,12 +372,19 @@ most sentences with numbers in them are not about any of these.
 - quote must be copied WORD FOR WORD from the text you are given. Do not paraphrase, do not
   tidy the grammar, do not merge two distant sentences. Keep it under 200 characters. If you
   cannot copy it exactly, do not record the claim.
+- When one sentence carries several numbers, quote the CLAUSE around the number this claim is
+  about, not the whole sentence. Still word for word, just the shorter span. Two claims from the
+  same sentence must not carry the same quote.
 - value is the number as digits. This text spells numbers out in words, so convert:
   "twenty three thousand dollars" -> 23000, "six point eight five percent" -> 6.85,
   "eight thousand five hundred fifty dollars" -> 8550.
 - unit is "usd" for dollar amounts, "pct" for percentages, null otherwise.
 - year_hint is the year the sentence itself names, and null when it names none.
-- One claim per sentence-with-a-number. Record every one you find.
+- ONE CLAIM PER NUMBER, not per sentence. A sentence holding three numbers produces three
+  claims, each with its own quote and its own value.
+  "Say you have three hundred thousand dollars left on the loan, your payment is about one
+  thousand two hundred dollars a month, and you have found an extra five hundred" is THREE
+  claims, not one. Record every number you find.
 """
 
 

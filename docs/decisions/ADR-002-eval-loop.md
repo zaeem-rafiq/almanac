@@ -445,3 +445,68 @@ The peer message lists D-1..D-4 and D-6 as still awaiting. **D-7 is also still a
 added after that message was drafted. Six decisions remain unratified: D-1, D-2, D-3, D-4, D-6, D-7.
 
 `evals/results.md` on disk is from a **pre-sweep** run and should be regenerated once credits allow.
+
+---
+
+## D-2 RESOLUTION — the merging instruction was in the prompt, and is now removed
+
+**Status:** RATIFIED by Zaeem · **Fix applied:** prompt (`almanac/extract.py`) ·
+**NOT YET VERIFIED — see the caveat below**
+
+**The cause was one line**, and it was explicit rather than emergent:
+
+```
+- One claim per sentence-with-a-number. Record every one you find.
+```
+
+The extractor was *instructed* to merge. A sentence carrying three numbers was told to produce one
+claim, which is exactly D-2 mechanism (i) — lines 5, 12 and 27 each label a number inside a
+sentence whose other number took the pairing.
+
+**The change**, two bullets in `SYSTEM_PROMPT`:
+
+* `ONE CLAIM PER NUMBER, not per sentence`, with the v2 mortgage sentence given as a worked
+  three-claim example.
+* When a sentence carries several numbers, quote the **clause** around each number rather than
+  the whole sentence, and never emit the same quote twice. Without this the fix would be a no-op:
+  `_assemble` dedupes by span, so three claims sharing one whole-sentence quote collapse back to
+  one.
+
+**Guarded by two offline tests** (`tests/test_extract.py`), because a prompt line has no other
+guard — nothing else in the suite fails if it silently reverts, and its effect is visible only in
+a live run.
+
+The repo's own `test_system_prompt_contains_no_verdict_vocabulary` rejected the first draft: the
+phrase "most often got wrong" tripped the forbidden-word list. The wording was changed, not the
+test. That guard exists to stop verdict language leaking into the half of the system that cannot
+carry a `rule_fired`, and it did its job.
+
+### What this does NOT fix, by design
+
+D-2 mechanism (ii) — lines 25 and 29, where the *labelled quote spans a sentence boundary*
+("Ten thousand dollars. It showed up, it is yours"). The extractor quoting a single sentence is
+correct there, and the prompt still says not to merge distant sentences. Those two rows remain my
+read of LABEL-side, and this change deliberately leaves them alone.
+
+### ⚠ The caveat: this is applied but unmeasured
+
+**The Anthropic credit balance is exhausted, so the eval could not be re-run** (400, "credit
+balance is too low"). Everything verifiable offline is green — `pytest tests/ -q` → **246 passed** —
+but the offline suite can only prove the prompt *says* the right thing, never that the model *does*
+the right thing. The claim "D-2 is fixed" is **not** established by this commit.
+
+Three specific risks, all unmeasured:
+
+1. **Quote quality.** D-2's own analysis warned that one-claim-per-number "would raise this metric
+   and lower quote quality, which is the wrong trade for a product whose output a human reads".
+   Clause-level quotes are shorter and may read worse in an update note. That trade was accepted by
+   ratification, not by measurement.
+2. **Verdict counts move.** More claims per sentence means more verdicts, which shifts the `skip`
+   band and every count in `docs/proofs/A-04.md` and `evals/results.md`.
+3. **Interaction with the coverage sweep** (`d314e9a`). The sweep re-reads number-bearing sentences
+   with no claim; changing what counts as a claim changes what it considers uncovered.
+
+**Required before this is believed:** restore credits, then `python -m almanac eval` six times and
+compare against the post-sweep baseline in D-5 (6/6 gate, `stale_material` 7/7, matched 45–48). If
+`matched` rises toward 51 with the gate still green, D-2 is fixed. If the gate flaps or
+`stale_material` drops, revert the prompt and re-open this decision.
