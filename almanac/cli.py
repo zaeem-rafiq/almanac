@@ -167,6 +167,130 @@ def _cmd_judge(args) -> int:
     return 0
 
 
+CORPUS_CHANNEL = REPO_ROOT / "corpus" / "channel"
+
+STATUS_MARK = {
+    "stale_material": "🔴", "stale_immaterial": "🟡", "correct": "🟢",
+    "unresolved": "⚪", "skip": "·",
+}
+
+
+def _shown(path):
+    """Print a repo-relative path when the output landed inside the repo, else the full one."""
+    from pathlib import Path
+
+    try:
+        return Path(path).resolve().relative_to(REPO_ROOT)
+    except ValueError:
+        return Path(path).resolve()
+
+
+def _judged(sources, draft_notes: bool):
+    """extract -> judge -> (optionally) notes. The only order this pipeline may run in.
+
+    The model labels (extract), then the code decides (judge), then the model phrases what the code
+    already decided (notes). Nothing downstream of `judge` can change a status: `notes.annotate`
+    returns prose keyed by (source_id, locator) and never a verdict.
+    """
+    from almanac.extract import extract_sources
+    from almanac.judge import judge_all
+    from almanac.notes import annotate
+
+    by_source = extract_sources(sources)
+    judged = {sid: judge_all(claims) for sid, claims in by_source.items()}
+    notes = {}
+    if draft_notes:
+        for verdicts in judged.values():
+            notes.update(annotate(verdicts))
+    return judged, notes
+
+
+def _print_rows(source_id: str, rows) -> None:
+    print(f"\n{source_id}  —  {len(rows)} claim(s)")
+    print(f"{'':<2} {'LOCATOR':<14} {'STATUS':<17} {'SAID':>12} {'CURRENT':>12}  RULE")
+    print("-" * 130)
+    for r in rows:
+        said = "—" if r.claimed_value is None else f"{r.claimed_value:,.2f}"
+        now = "—" if r.current_value is None else f"{r.current_value:,.2f}"
+        flag = " ⚠stale-feed" if r.fact_stale else ""
+        print(f"{STATUS_MARK[r.status]:<2} {r.locator:<14} {r.status:<17} {said:>12} {now:>12}  "
+              f"{r.rule_fired}{flag}")
+        if r.note:
+            print(f"{'':<2} {'':<14} note ({r.note_source}): {r.note}")
+
+
+def _summary(counts) -> str:
+    return "  ".join(
+        f"{STATUS_MARK[s]} {s}={counts.get(s, 0)}"
+        for s in ["stale_material", "stale_immaterial", "correct", "unresolved", "skip"]
+    )
+
+
+def _cmd_scan(args) -> int:
+    """`scan --source corpus|youtube --out reports/` — judge a whole back catalogue.
+
+    Every verdict in this output came from `almanac/judge.py`. Each line carries the rule that
+    produced it; a status without a rule would be a bug, not a formatting slip.
+    """
+    from almanac.extract import discover_sources
+    from almanac.report import build_report, write_report
+
+    if args.source == "corpus":
+        sources = discover_sources(args.target or CORPUS_CHANNEL)
+    else:
+        try:
+            from almanac import youtube
+        except ImportError as exc:  # pragma: no cover - depends on A-06 landing
+            print(f"--source youtube needs almanac/youtube.py (A-06): {exc}")
+            return 2
+        # A-06 (branch claude/competent-galileo-832037) exposes `read_youtube_sources()` and
+        # `iter_sources(origin=...)`, both returning A-03's `extract.Source`.
+        #
+        # `iter_sources` DEFAULTS TO origin="corpus". Calling it bare here would scan the local
+        # corpus while this command reported YouTube — and would make A-06's proof 3 ("youtube
+        # status counts == corpus status counts") pass by comparing the corpus against itself.
+        # So the origin is always passed explicitly, and the preferred entry point is the one
+        # that cannot be pointed anywhere else.
+        if hasattr(youtube, "read_youtube_sources"):
+            sources = list(youtube.read_youtube_sources())
+        elif hasattr(youtube, "iter_sources"):
+            sources = list(youtube.iter_sources(origin="youtube"))
+        elif hasattr(youtube, "fetch_sources"):
+            sources = list(youtube.fetch_sources())
+        else:
+            print(
+                "--source youtube needs almanac/youtube.py to expose read_youtube_sources() or "
+                "iter_sources(origin='youtube') returning extract.Source objects; A-06 owns that "
+                "module and it has not landed on main yet."
+            )
+            return 2
+
+    judged, notes = _judged(sources, draft_notes=not args.no_notes)
+    report = build_report(args.source, judged, notes)
+    json_path, md_path = write_report(report, args.out)
+
+    for video in report.videos:
+        _print_rows(video.source_id, video.verdicts)
+    print("-" * 130)
+    print(_summary(report.counts))
+    print(f"wrote {_shown(json_path)} and {_shown(md_path)}")
+    return 0
+
+
+def _cmd_lint(args) -> int:
+    """`lint <path>` — judge one script or caption file and print the verdicts."""
+    from almanac.extract import read_source
+    from almanac.report import counts_by_status, to_row
+
+    source = read_source(args.target)
+    judged, notes = _judged([source], draft_notes=args.notes)
+    rows = [to_row(v, notes) for v in judged[source.source_id]]
+    _print_rows(source.source_id, rows)
+    print("-" * 130)
+    print(_summary(counts_by_status(rows)))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
@@ -188,6 +312,18 @@ def main(argv: list[str] | None = None) -> int:
     judge_cmd.add_argument("target", help="a .srt/.md file, a video directory, or a tree of them")
     judge_cmd.add_argument("--all", action="store_true", help="include skipped claims")
     judge_cmd.set_defaults(func=_cmd_judge)
+
+    scan = sub.add_parser("scan", help="judge a whole back catalogue and write a report")
+    scan.add_argument("--source", choices=["corpus", "youtube"], default="corpus")
+    scan.add_argument("--out", default=None, help="output directory (default: reports/)")
+    scan.add_argument("--target", default=None, help="override the corpus directory to scan")
+    scan.add_argument("--no-notes", action="store_true", help="skip drafting update notes")
+    scan.set_defaults(func=_cmd_scan)
+
+    lint = sub.add_parser("lint", help="judge one script or caption file")
+    lint.add_argument("target", help="a .srt/.md file")
+    lint.add_argument("--notes", action="store_true", help="also draft the update notes")
+    lint.set_defaults(func=_cmd_lint)
 
     args = parser.parse_args(argv)
     return args.func(args)
