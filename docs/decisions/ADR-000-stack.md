@@ -190,3 +190,16 @@ returns `accessNotConfigured`, and both calls above returned 200.
 |---|---|---|---|
 | 2026-09-07 | *(none — 0 items)* | `.../youtube.force-ssl` | FAIL, wrong identity |
 | 2026-09-07 | *(none — 0 items, forced `select_account consent`)* | `.../youtube.force-ssl` | FAIL, wrong identity |
+
+### G-4 — RESOLVED 2026-09-07.
+
+Root cause was identity, not configuration: the first two consents authorised a Google account
+that owned no channel. Pointing `ALMANAC_TEST_CHANNEL_ID` at a genuine throwaway channel and
+re-consenting as its owner produced a match on the first try.
+
+| Date authorised | Channel id | Title | Scope | Refresh-token expiry (Testing mode) |
+|---|---|---|---|---|
+| **2026-09-07** | `UCb0N54LdHk-10KgrL4n3LIA` | `almanac` | `.../auth/youtube.force-ssl` | **2026-09-14** (7 days) |
+
+Comfortably covers the Tue Sep 8 07:00 America/Chicago deadline. If work continues past
+Sep 14, `rm token.json` and re-consent.
