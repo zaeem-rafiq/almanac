@@ -298,7 +298,7 @@ def test_download_captions_decodes_the_bytes_adr_000_documented():
     )
     text = yt.download_captions("vid1", fake, yt.QuotaLedger(), wait=False)
     assert text == SRT_ONE
-    assert len(yt.cues_from_srt(text)) == 2
+    assert len(yt.source_from_srt("vid1", text).locators) == 2
 
 
 def test_machine_transcription_is_never_preferred_over_an_uploaded_track():
@@ -371,17 +371,18 @@ def test_corpus_and_youtube_sources_are_the_same_shape(sandbox):
         caption_bodies={"cap1": SRT_ONE.encode("utf-8")},
     )
 
+    from almanac.extract import Locator, Source
+
     from_corpus = yt.iter_sources("corpus", corpus_dir=sandbox)
     from_youtube = yt.read_youtube_sources(fake, yt.QuotaLedger())
 
     assert len(from_corpus) == len(from_youtube) == 5
     for source in from_corpus + from_youtube:
-        assert isinstance(source, yt.Source)
+        # A-03's own type, not a parallel one — A-04 must not have two shapes to reconcile.
+        assert isinstance(source, Source)
         assert source.source_id and source.text and source.locators
-        assert all(isinstance(cue, yt.Cue) for cue in source.locators)
-    assert {s.origin for s in from_corpus} == {"corpus"}
-    assert {s.origin for s in from_youtube} == {"youtube"}
-    assert {s.source_id for s in from_corpus} == {s.source_id for s in from_youtube}
+        assert all(isinstance(locator, Locator) for locator in source.locators)
+    assert {s.source_id for s in from_youtube} == {v["video_id"] for v in videos}
 
 
 def test_iter_sources_rejects_an_unknown_origin():
@@ -389,8 +390,20 @@ def test_iter_sources_rejects_an_unknown_origin():
         yt.iter_sources("vimeo")
 
 
-def test_cues_carry_timings_so_a_verdict_can_point_at_a_timestamp():
-    cues = yt.cues_from_srt(SRT_ONE)
-    assert [c.index for c in cues] == [1, 2]
-    assert cues[0].start_s == 0.0 and cues[0].end_s == 2.8
-    assert "23000" in cues[0].text
+def test_locators_carry_timestamps_so_a_verdict_can_point_at_one():
+    source = yt.source_from_srt("vid1", SRT_ONE)
+    assert [locator.label for locator in source.locators] == ["00:00:00,000", "00:00:03,000"]
+    first = source.locators[0]
+    assert "23000" in source.text[first.start:first.end]
+
+
+def test_a_downloaded_caption_flattens_exactly_as_the_corpus_reader_would(sandbox):
+    """The guarantee behind the deferred proof: one flattener, not two that agree for now."""
+    from almanac.extract import read_srt
+
+    slug = sorted(p.name for p in sandbox.iterdir() if p.is_dir())[0]
+    path = sandbox / slug / "captions.srt"
+    from_disk = read_srt(path)
+    as_if_downloaded = yt.source_from_srt("vid1", path.read_text())
+    assert as_if_downloaded.text == from_disk.text
+    assert as_if_downloaded.locators == from_disk.locators

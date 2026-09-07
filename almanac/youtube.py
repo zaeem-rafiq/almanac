@@ -21,12 +21,16 @@ channel rather than assuming it.
 
 Return shape
 ------------
-`list_channel_videos()` and `iter_sources()` return `Source` records carrying
-`source_id` / `text` / `locators` — deliberately the same shape the corpus reader yields,
-so A-04's `scan` can consume `--source youtube` and `--source corpus` behind one interface
-without either path knowing which it got. A-04 is free to lift `Source` and `Cue` out of
-here into a shared module; they live here only because `almanac/models.py` belongs to a
-session running in parallel with this one.
+`iter_sources()` returns **`almanac.extract.Source`** — A-03's own record, not a parallel
+one defined here. A-03 landed `Source(source_id, text, locators)` while this issue was in
+flight, which is exactly the shape A-06 was asked to return, so returning anything else
+would hand A-04 two near-identical types to reconcile.
+
+More than the type is shared: a downloaded caption is flattened by A-03's `read_srt`, so
+the text and locator labels the extractor sees are byte-identical whether a video arrived
+from `corpus/channel/` or from the live API. That is what makes the deferred proof —
+`scan --source youtube` status counts == `scan --source corpus` status counts — a
+comparison A-04 can simply run, rather than a difference in two flatteners.
 """
 
 from __future__ import annotations
@@ -62,34 +66,6 @@ CAPTION_POLL_SECONDS = 15
 
 class YouTubeError(RuntimeError):
     """Raised for an Almanac-level failure (identity, missing track), not a transport error."""
-
-
-@dataclass(frozen=True)
-class Cue:
-    """One caption cue. `index` is 1-based, matching SRT numbering."""
-
-    index: int
-    start_s: float
-    end_s: float
-    text: str
-
-
-@dataclass(frozen=True)
-class Source:
-    """One reviewable unit of a creator's back catalogue.
-
-    Identical in shape whether it came from `corpus/channel/` or from the live channel, so a
-    caller can hold both without branching. `locators` is what lets a verdict point back at
-    "this sentence, at 04:12" rather than at the video as a whole.
-    """
-
-    source_id: str
-    title: str
-    published_at: str
-    description: str
-    text: str
-    locators: tuple[Cue, ...]
-    origin: str
 
 
 @dataclass
@@ -354,75 +330,56 @@ def download_captions(
 
 # ----------------------------------------------------- the one shape both sources return
 
-def cues_from_srt(srt_text: str) -> tuple[Cue, ...]:
-    """Parse SRT into locators using the `srt` library, not a hand-rolled regex.
+def source_from_srt(source_id: str, srt_text: str):
+    """Flatten downloaded SRT into an `almanac.extract.Source` using A-03's OWN reader.
 
-    The library is already a project dependency and it is the same parser A-02 used on the
-    corpus, so corpus-side and API-side text cannot diverge through parser differences.
+    The temp file is deliberate. `extract.read_srt` takes a path, and reusing it unchanged is
+    worth more than the tidiness of a text-taking variant: it guarantees the API path and the
+    corpus path flatten identically — same cue joining, same character offsets, same locator
+    timestamps. Re-implementing that here would be a second flattener that agrees with the
+    first only until one of them is edited, and the whole point of the deferred proof is that
+    the two paths produce the same verdicts.
     """
-    import srt as srt_lib
+    import dataclasses
+    import tempfile
 
-    return tuple(
-        Cue(
-            index=sub.index if sub.index is not None else i,
-            start_s=sub.start.total_seconds(),
-            end_s=sub.end.total_seconds(),
-            text=sub.content.replace("\n", " ").strip(),
-        )
-        for i, sub in enumerate(srt_lib.parse(srt_text), start=1)
-    )
+    from almanac.extract import read_srt
 
-
-def _flatten(cues: tuple[Cue, ...]) -> str:
-    return " ".join(cue.text for cue in cues if cue.text)
-
-
-def read_corpus_sources(corpus_dir: Path | None = None) -> list[Source]:
-    """The `--source corpus` half of the interface. No network, no credentials."""
-    import json
-
-    directory = corpus_dir or CORPUS_DIR
-    sources = []
-    for folder in sorted(p for p in directory.iterdir() if p.is_dir()):
-        meta = json.loads((folder / "meta.json").read_text(encoding="utf-8"))
-        cues = cues_from_srt((folder / "captions.srt").read_text(encoding="utf-8"))
-        sources.append(
-            Source(
-                source_id=meta["video_id"],
-                title=meta["title"],
-                published_at=meta["published_at"],
-                description=meta["description"],
-                text=_flatten(cues),
-                locators=cues,
-                origin="corpus",
-            )
-        )
-    return sources
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".srt", encoding="utf-8", delete=False
+    ) as handle:
+        handle.write(srt_text)
+        temp_path = handle.name
+    try:
+        source = read_srt(temp_path)
+    finally:
+        os.unlink(temp_path)
+    # read_srt derives source_id from the path, which here is a temp file. The real identity
+    # is the video id.
+    return dataclasses.replace(source, source_id=source_id)
 
 
-def read_youtube_sources(youtube=None, ledger: QuotaLedger | None = None) -> list[Source]:
-    """The `--source youtube` half of the interface — same `Source` records, live channel."""
+def read_corpus_sources(corpus_dir: Path | None = None) -> list:
+    """The `--source corpus` half — A-03's discover_sources, no network, no credentials."""
+    from almanac.extract import discover_sources
+
+    return discover_sources(corpus_dir or CORPUS_DIR)
+
+
+def read_youtube_sources(youtube=None, ledger: QuotaLedger | None = None) -> list:
+    """The `--source youtube` half — same `Source` type, same flattener, live channel."""
     youtube = youtube or build_client()
     ledger = ledger if ledger is not None else QuotaLedger()
 
-    sources = []
-    for video in list_channel_videos(youtube, ledger):
-        cues = cues_from_srt(download_captions(video["video_id"], youtube, ledger))
-        sources.append(
-            Source(
-                source_id=video["video_id"],
-                title=video["title"],
-                published_at=video["published_at"],
-                description=video["description"],
-                text=_flatten(cues),
-                locators=cues,
-                origin="youtube",
-            )
+    return [
+        source_from_srt(
+            video["video_id"], download_captions(video["video_id"], youtube, ledger)
         )
-    return sources
+        for video in list_channel_videos(youtube, ledger)
+    ]
 
 
-def iter_sources(origin: str = "corpus", **kwargs) -> list[Source]:
+def iter_sources(origin: str = "corpus", **kwargs) -> list:
     """Single entry point A-04's `scan --source {corpus,youtube}` can call."""
     if origin == "corpus":
         return read_corpus_sources(**kwargs)

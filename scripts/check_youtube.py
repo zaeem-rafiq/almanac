@@ -46,7 +46,7 @@ from almanac.youtube import (  # noqa: E402
     QuotaLedger,
     YouTubeError,
     build_client,
-    cues_from_srt,
+    source_from_srt,
     download_captions,
     list_channel_videos,
     match_videos_to_corpus,
@@ -88,8 +88,9 @@ def _words(text: str) -> list[str]:
     at a boundary. Those are not content drift and must not fail the check.
     """
     try:
-        cues = cues_from_srt(text)
-        body = " ".join(cue.text for cue in cues) if cues else text
+        # Flatten through the SAME reader the extractor uses, so the comparator measures the
+        # text Almanac will actually read rather than an approximation of it.
+        body = source_from_srt("cmp", text).text or text
     except Exception:
         body = text  # not parseable as SRT; compare it raw rather than crash the comparator
     tokens = (token.strip(".,;:!?()[]\"'") for token in body.lower().split())
@@ -197,15 +198,15 @@ def prove_caption_fidelity(slug: str, downloaded_srt: str) -> tuple[bool, str]:
         )
 
     try:
-        cues = cues_from_srt(downloaded_srt)
+        parsed = source_from_srt("downloaded", downloaded_srt)
     except Exception as exc:
         return False, f"downloaded caption did not parse as SRT: {type(exc).__name__}: {exc}"
-    if not cues:
+    if not parsed.locators:
         return False, "downloaded caption parsed to zero cues"
 
     ratio = word_diff_ratio(corpus_srt, downloaded_srt)
     detail = (
-        f"{slug} cues={len(cues)} word_diff={ratio:.4%} threshold={WORD_DIFF_THRESHOLD:.0%} "
+        f"{slug} cues={len(parsed.locators)} word_diff={ratio:.4%} threshold={WORD_DIFF_THRESHOLD:.0%} "
         f"(control={control_ratio:.2%} RED as required)"
     )
     return ratio < WORD_DIFF_THRESHOLD, detail
