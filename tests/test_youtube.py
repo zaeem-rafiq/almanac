@@ -407,3 +407,94 @@ def test_a_downloaded_caption_flattens_exactly_as_the_corpus_reader_would(sandbo
     as_if_downloaded = yt.source_from_srt("vid1", path.read_text())
     assert as_if_downloaded.text == from_disk.text
     assert as_if_downloaded.locators == from_disk.locators
+
+
+# --------------------------------------------------- the live runner, exercised offline
+
+class MultiCaptionFake(FakeYouTube):
+    """Serves a different caption body per video, so a whole scan can be driven offline."""
+
+    def __init__(self, srt_by_video, **kwargs):
+        super().__init__(**kwargs)
+        self.srt_by_video = srt_by_video
+
+    def captions(self):
+        outer = self
+
+        class _Captions:
+            def list(self, **kw):
+                outer.seen.append(("captions.list", kw))
+                return _Request({"items": [{
+                    "id": "cap-" + kw["videoId"],
+                    "snippet": {"language": "en", "trackKind": "standard"},
+                }]})
+
+            def download(self, **kw):
+                outer.seen.append(("captions.download", kw))
+                if kw.get("tfmt") != outer.accepted_tfmt:
+                    return _Request(RuntimeError(f"HTTP 400: bad tfmt {kw.get('tfmt')!r}"))
+                return _Request(outer.srt_by_video[kw["id"].replace("cap-", "")].encode("utf-8"))
+
+        return _Captions()
+
+
+def test_the_live_proof_runner_passes_end_to_end_offline(sandbox, tmp_path, monkeypatch):
+    """Drives scripts/check_youtube.py's main() with a fake channel.
+
+    The live run happens once, against Zaeem's real uploads, and a NameError discovered at
+    that moment costs a round-trip through a human. This exercises the whole runner —
+    listing, id write-back, the G-2 tfmt probe, all five downloads, every proof and the
+    proof-file append — before it is ever pointed at the network.
+    """
+    videos = fake_uploads(sandbox)
+    slugs = sorted(p.name for p in sandbox.iterdir() if p.is_dir())
+    srt_by_video = {
+        v["video_id"]: (sandbox / slug / "captions.srt").read_text()
+        for v, slug in zip(videos, slugs)
+    }
+
+    fake = MultiCaptionFake(
+        srt_by_video,
+        channels=CHANNEL_OK,
+        playlist_items={"items": [{"contentDetails": {"videoId": v["video_id"]}} for v in videos]},
+        videos={"items": [
+            {"id": v["video_id"],
+             "snippet": {"title": v["title"], "description": "d",
+                         "publishedAt": "2024-01-01T00:00:00Z"},
+             "contentDetails": {"duration": "PT30S", "caption": "true"}}
+            for v in videos
+        ]},
+    )
+    proof_path = tmp_path / "A-06.md"
+    monkeypatch.setattr(cy, "PROOF_PATH", proof_path)
+    monkeypatch.setattr(cy, "build_client", lambda *a, **k: fake)
+
+    assert cy.main([]) == 0
+
+    written = proof_path.read_text()
+    assert written.count("= PASS") == 3
+    assert "= DEFERRED" in written
+    # The quota line is arithmetic, so it must reproduce exactly.
+    assert "1008" in written
+
+
+def test_the_runner_refuses_to_write_a_proof_from_a_partial_channel(sandbox, monkeypatch, tmp_path):
+    """Four uploads is not five. It must not produce a proof file at all."""
+    videos = fake_uploads(sandbox)[:4]
+    fake = MultiCaptionFake(
+        {},
+        channels=CHANNEL_OK,
+        playlist_items={"items": [{"contentDetails": {"videoId": v["video_id"]}} for v in videos]},
+        videos={"items": [
+            {"id": v["video_id"],
+             "snippet": {"title": v["title"], "description": "d", "publishedAt": ""},
+             "contentDetails": {"duration": "PT30S", "caption": "true"}}
+            for v in videos
+        ]},
+    )
+    proof_path = tmp_path / "A-06.md"
+    monkeypatch.setattr(cy, "PROOF_PATH", proof_path)
+    monkeypatch.setattr(cy, "build_client", lambda *a, **k: fake)
+
+    assert cy.main([]) == 2
+    assert not proof_path.exists()
