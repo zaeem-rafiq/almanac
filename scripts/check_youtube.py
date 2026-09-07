@@ -9,7 +9,8 @@ HAC-42 lists four proofs. The third,
 
     PROOF A-06: scan --source youtube status counts == scan --source corpus status counts
 
-needs the `scan` command that A-04 builds, and A-04 has not started — it is blocked on A-03.
+needs a `scan --source {corpus,youtube}` command. A-04 has since landed `extract` and `judge`,
+but no `scan` subcommand exists yet, so the comparison still cannot be run.
 It is recorded in `docs/proofs/A-06.md` as DEFERRED and is **not** reported as passing here.
 A-06 does not close on this run. Everything else in the issue is proven live.
 
@@ -308,7 +309,8 @@ def main(argv: list[str] | None = None) -> int:
         f"PROOF A-06: quota used for the full scan < {QUOTA_BUDGET:,} units "
         f"(5 x captions.download @200 + lists) = {'PASS' if quota_ok else 'FAIL'}",
         "PROOF A-06: scan --source youtube status counts == scan --source corpus status "
-        "counts = DEFERRED (needs A-04's scan command; A-04 not started)",
+        "counts = DEFERRED (needs a `scan --source {corpus,youtube}` command; A-04 has "
+        "landed extract/judge but no scan subcommand exists yet)",
     ]
 
     print("-" * 72)
