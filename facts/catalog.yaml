@@ -188,11 +188,10 @@ entities:
         effective_from: 2024-11-01
         effective_to: 2025-04-30
         source_url: https://www.treasurydirect.gov/files/savings-bonds/i-bond-rate-chart.pdf
-      # SCAFFOLD — value awaiting Zaeem (A-03 finding F-2a). The window is the May/November
-      # reset cadence already used by the rows above; the value is NOT filled by the agent,
-      # per the Project Rules: manual values come from Zaeem with a treasurydirect.gov URL.
-      # This is the window v5-ibonds cites ("Back in 2022 it paid ...").
-      - value: null
+      # The window v5-ibonds cites ("Back in 2022 it paid ..."). Value supplied by Zaeem
+      # 2026-09-07 (A-03 finding F-2a); the agent scaffolded the window and the source_url
+      # and left the number, per the Project Rules on manual values.
+      - value: 9.62
         effective_from: 2022-05-01
         effective_to: 2022-10-31
         source_url: https://www.treasurydirect.gov/files/savings-bonds/i-bond-rate-chart.pdf
