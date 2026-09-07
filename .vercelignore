@@ -1,0 +1,13 @@
+# A-09: keep the function bundle to the app and the data it reads.
+venv/
+tests/
+evals/
+renders/
+scripts/
+docs/
+.claude/
+.github/
+__pycache__/
+*.pyc
+token.json
+.env*

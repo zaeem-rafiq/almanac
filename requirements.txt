@@ -1,0 +1,16 @@
+# A-09: the deploy/CI dependency set. Versions are pinned to exactly what the working venv
+# resolves, read from its dist-info directories. Runtime only — pytest is not needed by the
+# host or by the nightly job.
+anthropic==1.4.0
+fastapi==0.141.1
+pydantic==2.13.5
+PyYAML==6.0.3
+requests==2.34.2
+srt==3.5.3
+uvicorn==0.52.4
+
+# Needed only by `scan --source youtube` in the nightly job. The web host never imports these:
+# almanac/youtube.py defers them to function scope, so a host with no token.json still starts.
+google-api-python-client==2.200.0
+google-auth==2.57.1
+google-auth-oauthlib==1.4.1
