@@ -1,0 +1,221 @@
+# ADR-002 — the eval loop, and what the first independent measurement found
+
+**Status:** proposed 2026-09-07 (A-05 / HAC-41). Decisions D-1..D-4 below each carry their own
+status. This file is append-only.
+
+## Context
+
+`python -m almanac eval` scores `extract` + `judge` against the 54 human labels in
+`evals/claims.jsonl`. It is the first measurement of the pipeline made by something other than
+the session that wrote the rules.
+
+**The rule that governs this issue: nothing is tuned to make the table green.**
+`evals/claims.jsonl` is not written by this branch — verified by
+`tests/test_eval.py::test_run_never_writes_the_labelled_set`, which hashes the file around a full
+run. `judge.MARKET_RATE_MATERIAL_PP` is not read by the harness and was not changed (D-4).
+
+## What the run found
+
+Live run, 2026-09-07, 7 sources → 77 verdicts:
+
+| metric | value |
+|---|---|
+| rows matched | **48 / 54** |
+| extraction recall | 89% |
+| `claim_type` accuracy | 98% (47/48) |
+| **status disagreements on matched rows** | **0** |
+| hard-negative false positives | **0** over 22 matched illustrative/historical rows |
+| `stale_material` | precision 1.00, recall 1.00 (7/7) |
+| `correct` / `stale_immaterial` / `unresolved` | recall 1.00 each (9/9, 2/2, 4/4) |
+| `skip` | precision 1.00, recall 0.81 (26/32) |
+
+### On the claimed "54/54 agreement" (commit `609af65`)
+
+Treated as a claim to verify, not a result to reproduce. The independent measurement **confirms
+the judge and refines the figure**: on every labelled row the harness could pair with a verdict,
+`judge.py` agrees — 48/48, zero disagreements, across all five statuses. It does not reproduce
+54/54, because 6 labelled rows never receive a verdict of their own. That is an **extraction
+granularity** gap, not a judge disagreement, and the two were previously reported as one number.
+
+How rows were matched, since the figure depends on it: a labelled row pairs with a verdict when
+the verdict's quote **covers ≥ 0.90 of the labelled quote** in normalised text (whitespace
+collapsed, curly quotes straightened — extraction's own leniency, nothing looser), greedy and
+one-to-one, ties broken by the tighter quote. See D-1.
+
+Every non-`skip` status has perfect precision *and* recall. All 6 unmatched rows are
+`expected_status: skip`. **The pipeline did not miss a single claim that needed a correction**,
+and did not invent one.
+
+---
+
+## D-1 — the matcher measures coverage, not span identity
+
+**Status:** AWAITING RATIFICATION · **Fix applied:** harness (`almanac/evaluate.py`)
+
+**The miss.** The first harness matched by intersection-over-union at IoU ≥ 0.30 and reported 8
+labelled rows as "not extracted". They had all been extracted. Example, line 5:
+
+| | |
+|---|---|
+| label | “Say you make seventy thousand dollars” |
+| verdict quote | “Say you make seventy thousand dollars and your plan matches six percent of your salary.” |
+| IoU | 0.43 → scored a miss |
+| coverage of the label | 1.00 → the claim was produced |
+| status | expected `skip`, got `skip` |
+
+**Which side was wrong: the harness.** A label is a short fragment a human chose to identify a
+sentence; an extracted quote is the whole sentence. They are *supposed* to differ in length. IoU
+answers "are these the same span?"; the question the metric owes us is "did the pipeline produce a
+verdict for this labelled claim?", which is containment.
+
+**Why this is not tuning to green.** Stated plainly because the distinction is the milestone:
+
+1. **The gate already passed under the old criterion** — `stale_material` recall 1.00, 0
+   hard-negative false positives. The change does not rescue a failing gate; it cannot buy a pass
+   that was already held.
+2. **It checks more rows, not fewer.** Matched rows rise from 46 to 48. The matched hard-negative
+   count is 22 under both criteria — the two rows it gained (lines 42 `correct`, 51
+   `stale_immaterial`) are not hard negatives — so the adversarial probe is no weaker and no
+   stronger, and the gate is decided on the same 22 rows either way.
+3. **It can reduce matches.** Coverage ≥ 0.90 rejects a verdict covering only part of a label,
+   which IoU ≥ 0.30 would accept. Line 14 fails both.
+4. **The floor is not load-bearing, and that is measured.** Best coverage is exactly 1.00 for 51
+   of 54 rows, then a cliff to 0.67. `sensitivity` sweeps 0.50 / 0.70 / 0.90 / 1.00 every run and
+   the report prints all four: **48 / 48 / 48 across the operating band**, and 49 at the 0.50
+   probe. The probe is there on purpose — a "constant" sweep is only evidence when the sweep is
+   capable of moving, and the report says so explicitly when it never moves.
+
+**Zaeem's call:** ratify, or reject and have the harness report both numbers side by side.
+
+---
+
+## D-2 — 6 labelled rows get no verdict of their own
+
+**Status:** AWAITING RATIFICATION · **Fix applied:** none yet — label or prompt, Zaeem's call
+
+All 6 expect `skip`; all 6 are `illustrative`; in every case a verdict *does* cover or overlap the
+sentence and that verdict is `skip`. The product outcome is identical either way — this is an
+accounting difference, not a wrong answer. Two mechanisms:
+
+**(i) Merged — the extractor emitted one claim where the labels count two.** The sibling row took
+the pairing; one-to-one assignment then leaves this one unmatched.
+
+| line | quote | swallowed by the verdict paired with |
+|---|---|---|
+| 5 | “Say you make seventy thousand dollars” | line 6 |
+| 12 | “Say you have three hundred thousand dollars left on the loan” | line 13 |
+| 27 | “you have no debt above eight percent” | line 26 |
+
+**(ii) Split — the labelled quote crosses a sentence boundary the extractor cut on.**
+
+| line | quote | best coverage |
+|---|---|---|
+| 14 | “an extra five hundred dollars a month you could throw at either side” | 0.31 (the covering quote hit `MAX_QUOTE_CHARS` and was trimmed mid-sentence) |
+| 25 | “Ten thousand dollars. It showed up, it is yours” | 0.45 (verdict quotes “Ten thousand dollars.”) |
+| 29 | “Whatever is left goes into three funds. Not thirty. Three.” | 0.67 (verdict quotes the first sentence) |
+
+**My read — the LABEL side, for five of the six.** Lines 5/12/27 label a *number inside* a
+sentence the extractor correctly quotes whole; lines 25/29 label a span crossing sentence
+boundaries, which the extractor is designed not to do. Making extraction emit one claim per number
+would raise this metric and lower quote quality, which is the wrong trade for a product whose
+output a human reads. Line 14 is the one I would call SYSTEM: the covering quote was truncated by
+`MAX_QUOTE_CHARS = 200` mid-sentence, so the second number in that sentence has no home.
+
+**Do not act on my read.** Each row needs your yes/no; nothing has been changed.
+
+---
+
+## D-3 — one `claim_type` disagreement
+
+**Status:** AWAITING RATIFICATION · **Fix applied:** none yet — label or prompt, Zaeem's call
+
+| line | quote | labelled | model said | status |
+|---|---|---|---|---|
+| 23 | “you can pull that money out of the account tax free in twen…” | `illustrative` | `structural` | `skip` both ways ✓ |
+
+`structural` is A-03's seventh label — "a rule about how this account behaves". A tax-free
+withdrawal condition arguably *is* structural, so this may be the label to move rather than the
+prompt. The status is unaffected: both route to `skip`. Cosmetic for the gate, real for the
+`claim_type` accuracy figure the README will quote.
+
+---
+
+## D-4 — `MARKET_RATE_MATERIAL_PP` was not touched
+
+**Status:** RECORDED (no change made) · **Fix applied:** none
+
+The issue forbids tuning R5's threshold to the eval set. It sits at 0.50pp and this branch neither
+reads nor changes it. Both `stale_immaterial` rows and the one `stale_material` market-rate row are
+classified correctly at that value, so there is no pressure on it from this run. `judge.py`'s own
+open question Q2 — that two labelled rows are thin evidence for a global constant, and a per-key
+threshold in `facts/catalog.yaml` would be better founded — stands unchanged and unaddressed here.
+
+---
+
+## Consequences
+
+* `evals/results.md` and `evals/results.json` are regenerated by every run; `results.md` is the
+  table the README quotes.
+* The gate is binary and lives in `evaluate.gate_failures`: any hard-negative false positive, or
+  `stale_material` recall < 0.90, exits non-zero. Liveness is asserted first — sources read,
+  verdicts produced, rows matched — so a run that produced nothing fails loudly instead of
+  reporting a perfect zero.
+* `--cache` persists one extraction. `docs/proofs/A-04.md` records 56–67 verdicts across otherwise
+  identical runs, so without it a rule change and a resample are indistinguishable during review.
+
+---
+
+## D-5 — the pipeline does not reliably pass its own gate, and the gate is right to say so
+
+**Status:** AWAITING RATIFICATION · **Fix applied:** none — this is a change to `extract.py`
+(A-03's module) and needs Zaeem's call before it is made
+
+**The finding.** The gate is not flaky because the gate is wrong. Extraction resamples on every
+run, and on some runs it drops a `stale_material` claim. Five independent LIVE runs:
+
+| run | verdicts | matched | `stale_material` | hard-neg FP | status disagreements | gate |
+|---|---|---|---|---|---|---|
+| 1 | 77 | 46/54¹ | 7/7 | 0 | 0 | PASS |
+| 2 | 68 | 42/54 | 6/7 | 0 | 0 | **FAIL** |
+| 3 | 65 | 42/54 | 6/7 | 0 | 0 | **FAIL** |
+| 4 | 77 | 48/54 | 7/7 | 0 | 0 | PASS |
+| 5 | 75 | 48/54 | 7/7 | 0 | 0 | PASS |
+
+¹ run 1 was scored under the pre-D-1 IoU matcher; the rest under coverage.
+
+**Two things this establishes, and they point in opposite directions.**
+
+1. **`judge.py` is solid.** *Zero* status disagreements in all five runs, across all five statuses.
+   Whatever extraction hands it, the judge rules correctly. This is the independent confirmation
+   the "54/54" claim was reaching for, and it holds.
+2. **`extract.py` is not reproducible.** Verdict counts range 65–77 on identical inputs, and the
+   gate fails 2 runs in 5. `docs/proofs/A-04.md` already recorded 56–67 verdicts across runs; that
+   variance was visible then and is now attached to a consequence.
+
+**The row that drops is always the same: line 35.**
+
+> `stale_material` · `market_rate` · `ibond_composite_rate`
+> “The composite rate right now is three point one one percent”
+
+It sits immediately before line 36 — “Back in 2022 it paid nine point six two percent”, the
+historical trap R1 exists for — and both sentences concern the *same entity*. The extractor
+sometimes emits only one claim for the pair. When it drops the live-rate sentence, a genuinely
+stale video goes uncorrected, which is a product failure, not a scoring artifact.
+
+**Cause, verified in the code, not inferred.** Neither `extract._call_model` nor
+`notes._draft` passes a `temperature` to `client.messages.create`, so both run at the Anthropic
+API default of 1.0. Extraction is a labelling task, not a generative one.
+
+**Recommended fix — `temperature=0.0` in `extract._call_model`.** This is a determinism setting
+on a classification call, chosen without reference to what the labels say, so it is not tuning to
+the eval set. **It is deliberately NOT applied here**, for two reasons: it changes A-03's shipped
+module, and proving it actually removes the flake needs several live runs, which is Zaeem's budget
+to spend, not mine to assume.
+
+**What must NOT happen.** Lowering `STALE_MATERIAL_RECALL_FLOOR` below 0.90, or moving the gate
+onto a cached extraction, would turn a passing gate into a statement about nothing. The floor
+stays at 0.90 and the gate stays on a live run. **The gate caught a real defect on its first
+outing — that is the harness working, not the harness misbehaving.**
+
+**Zaeem's call:** (a) pin `temperature=0.0` and re-measure, (b) treat the flake as an A-03 bug and
+file it, or (c) accept an intermittently-red gate for the demo and say so out loud.
