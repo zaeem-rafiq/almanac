@@ -64,10 +64,21 @@ def load_rates(path: Path | None = None) -> dict[str, RateRow]:
     return {k: RateRow(**v) for k, v in raw.items()}
 
 
+def _today() -> date:
+    """Calendar today, in LOCAL time.
+
+    facts/catalog.yaml holds statutory effective dates — plain calendar dates with no zone.
+    Comparing them against UTC made a window closing today read as expired for the whole of a
+    US afternoon and evening, because UTC had already rolled over. A US tax fact should expire
+    when the US day ends, not when London's does.
+    """
+    return date.today()
+
+
 def _age_days(as_of: date | None, today: date | None = None) -> int | None:
     if as_of is None:
         return None
-    return ((today or datetime.now(timezone.utc).date()) - as_of).days
+    return ((today or _today()) - as_of).days
 
 
 def current(key: str, today: date | None = None) -> Fact:
@@ -81,7 +92,7 @@ def current(key: str, today: date | None = None) -> Fact:
     entry = catalog[key]
 
     if entry.source == "manual":
-        now = today or datetime.now(timezone.utc).date()
+        now = today or _today()
         age = _age_days(entry.effective_from, now)
         # An entry whose window has CLOSED is expired: serving a 2025 limit as the live 2026 fact
         # is precisely the error Almanac exists to catch. `effective_to` must expire the value,

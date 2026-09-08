@@ -133,7 +133,7 @@ def draft_note(verdict: Verdict, client=None, model: str | None = None) -> tuple
     """
     value_string, year = required_strings(verdict)
     if client is None:
-        # Same construction extract.py uses: one place reads ANTHROPIC_API_KEY / LLM_MODEL.
+        # Same construction extract.py uses: one place builds the Vertex client and model id.
         from almanac.extract import _client
 
         client, default_model = _client()
@@ -142,18 +142,27 @@ def draft_note(verdict: Verdict, client=None, model: str | None = None) -> tuple
     system = SYSTEM_PROMPT.format(value_string=value_string, year=year)
     messages = [{"role": "user", "content": _brief(verdict)}]
 
+    from google.genai import types
+
+    # Vertex AI, same client extract.py builds. Note drafting is generative rather than a
+    # labelling task, so it does NOT pin temperature the way extraction does — but the code
+    # assertion in `check_note` is what actually governs the output, not the sampling.
     for _ in range(MAX_ATTEMPTS):
-        message = client.messages.create(
-            model=model, max_tokens=MAX_TOKENS, system=system, messages=messages
+        response = client.models.generate_content(
+            model=model,
+            contents=[{"role": m["role"], "parts": [{"text": m["content"]}]} for m in messages],
+            config=types.GenerateContentConfig(
+                system_instruction=system,
+                max_output_tokens=MAX_TOKENS,
+            ),
         )
-        note = "".join(
-            block.text for block in message.content if getattr(block, "type", None) == "text"
-        ).strip()
+        note = (getattr(response, "text", None) or "").strip()
         problems = check_note(note, verdict)
         if not problems:
             return note, "model"
+        # Gemini expects "model" where the Anthropic shape used "assistant".
         messages = messages + [
-            {"role": "assistant", "content": note or "(empty)"},
+            {"role": "model", "content": note or "(empty)"},
             {"role": "user", "content": "That note was rejected: " + "; ".join(problems)
              + ". Write it again, fixing exactly those problems."},
         ]

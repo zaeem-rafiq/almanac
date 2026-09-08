@@ -21,6 +21,9 @@ class Args:
     out = None
     target = None
     no_notes = True
+    # Mirrors `scan --batch`. This double stands in for argparse's namespace, so a new flag on
+    # the real parser belongs here too — otherwise the double drifts from what ships.
+    batch = False
 
 
 @pytest.fixture

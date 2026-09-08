@@ -34,7 +34,17 @@ CHARS_PER_TOKEN = 4
 CHUNK_TOKENS = 2_000
 CHUNK_CHARS = CHUNK_TOKENS * CHARS_PER_TOKEN
 MAX_CONCURRENCY = 4
-MAX_TOKENS = 4_096
+# Must cover THINKING PLUS the answer. thinking_level=HIGH spent 3,931 tokens on one 2.9k-char
+# chunk, leaving 151 of a 4,096 budget for output — the JSON truncated mid-object and four of
+# five videos silently extracted nothing. Measured, not guessed.
+MAX_TOKENS = 24_576
+# Fixed so a re-run reproduces a run. Available on Vertex; deprecated on claude-opus-5.
+EXTRACTION_SEED = 20260908
+# thinking_level="HIGH" is UNBOUNDED in practice: it expanded to consume whatever max_output_tokens
+# allowed (3,931 of 4,096; then 23,592 of 24,576) and truncated the answer every time. An explicit
+# budget caps thinking and leaves room for output. Measured on one v1 chunk: budget=4096 ->
+# thoughts=3,980, output=1,703, finish=STOP, 20 claims in 30s.
+THINKING_BUDGET = 4_096
 
 
 class Locator(NamedTuple):
@@ -372,12 +382,19 @@ most sentences with numbers in them are not about any of these.
 - quote must be copied WORD FOR WORD from the text you are given. Do not paraphrase, do not
   tidy the grammar, do not merge two distant sentences. Keep it under 200 characters. If you
   cannot copy it exactly, do not record the claim.
+- When one sentence carries several numbers, quote the CLAUSE around the number this claim is
+  about, not the whole sentence. Still word for word, just the shorter span. Two claims from the
+  same sentence must not carry the same quote.
 - value is the number as digits. This text spells numbers out in words, so convert:
   "twenty three thousand dollars" -> 23000, "six point eight five percent" -> 6.85,
   "eight thousand five hundred fifty dollars" -> 8550.
 - unit is "usd" for dollar amounts, "pct" for percentages, null otherwise.
 - year_hint is the year the sentence itself names, and null when it names none.
-- One claim per sentence-with-a-number. Record every one you find.
+- ONE CLAIM PER NUMBER, not per sentence. A sentence holding three numbers produces three
+  claims, each with its own quote and its own value.
+  "Say you have three hundred thousand dollars left on the loan, your payment is about one
+  thousand two hundred dollars a month, and you have found an extra five hundred" is THREE
+  claims, not one. Record every number you find.
 """
 
 
@@ -410,39 +427,79 @@ def _admit_entity_key(proposed: str | None, allowed: set[str]) -> str | None:
 # ------------------------------------------------------------------------------- the model call
 
 
+# Vertex AI, not the Anthropic API. Zaeem has Google Cloud credits and the Anthropic balance is
+# exhausted. The project is passed EXPLICITLY and `gcloud config set project` is never called, so
+# this cannot reach any other project of his by accident — the isolation is structural, not careful.
+DEFAULT_PROJECT = "polygraph-hackathon"
+DEFAULT_LOCATION = "global"
+DEFAULT_MODEL = "gemini-3.8-flash"
+
+
 def _client():
-    import anthropic
+    """A Vertex AI client bound to one explicit project, plus the model id to call.
+
+    Credentials come from Application Default Credentials (`gcloud auth application-default
+    login`). No API key is read or stored for this path.
+    """
+    from google import genai
 
     from almanac.cli import load_env
 
     load_env()
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set — see .env")
-    return anthropic.Anthropic(api_key=api_key), os.environ.get("LLM_MODEL", "claude-opus-5")
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT", DEFAULT_PROJECT)
+    location = os.environ.get("GOOGLE_CLOUD_LOCATION", DEFAULT_LOCATION)
+    model = os.environ.get("LLM_MODEL", DEFAULT_MODEL)
+    return genai.Client(vertexai=True, project=project, location=location), model
 
 
 def _call_model(chunk_text: str, system_prompt: str, client, model: str) -> list[ExtractedClaim]:
     """One tool-use round trip. Call shape verified in ADR-000 §4 / scripts/preflight.py."""
-    message = client.messages.create(
+    from google.genai import types
+
+    # `response_schema` takes the Pydantic class itself, so `Extraction` carries over from the
+    # Anthropic tool-use shape unchanged — the schema, the prompt and the claim model are the same.
+    #
+    # temperature=0.0 and a fixed seed are BOTH available here, unlike on claude-opus-5 where every
+    # sampling parameter is deprecated (ADR-000 §10). This is the determinism ADR-002 D-5 asked for
+    # and could not have. The coverage sweep below stays as a second line of defence: a pinned
+    # sample is still a sample, and the sweep checks completeness rather than trusting it.
+    response = client.models.generate_content(
         model=model,
-        max_tokens=MAX_TOKENS,
-        system=system_prompt,
-        tools=[{
-            "name": TOOL_NAME,
-            "description": "Record every sentence that contains a number, with its label.",
-            "input_schema": Extraction.model_json_schema(),
-        }],
-        tool_choice={"type": "tool", "name": TOOL_NAME},
-        messages=[{"role": "user", "content": chunk_text}],
+        contents=chunk_text,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            response_mime_type="application/json",
+            response_schema=Extraction,
+            temperature=0.0,
+            seed=EXTRACTION_SEED,
+            max_output_tokens=MAX_TOKENS,
+            thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET),
+        ),
     )
-    blocks = [b for b in message.content if getattr(b, "type", None) == "tool_use"]
-    if not blocks:
-        return []
-    try:
-        return Extraction.model_validate(blocks[0].input).claims
-    except ValidationError:
-        return []
+    parsed = getattr(response, "parsed", None)
+    if isinstance(parsed, Extraction):
+        return parsed.claims
+
+    # Everything below is a FAILED chunk. Say so loudly: an empty list here is indistinguishable
+    # from "this transcript had no numbers in it", and that is exactly how a truncated response
+    # silently dropped four whole videos once.
+    candidate = (getattr(response, "candidates", None) or [None])[0]
+    reason = getattr(candidate, "finish_reason", None)
+    usage = getattr(response, "usage_metadata", None)
+    detail = f"finish_reason={reason}"
+    if usage is not None:
+        detail += (f" thoughts={getattr(usage, 'thoughts_token_count', None)}"
+                   f" candidates={usage.candidates_token_count}")
+    text = (getattr(response, "text", None) or "").strip()
+    if text:
+        try:
+            return Extraction.model_validate_json(text).claims
+        except ValidationError:
+            pass
+    raise ExtractionFailed(
+        f"the model returned no usable claims for a chunk ({detail}); "
+        f"{len(text)} chars of unparseable text"
+    )
 
 
 # --- Coverage sweep (ADR-002 D-5) ------------------------------------------------------------
@@ -515,6 +572,11 @@ def uncovered_sentences(text: str, claims: Iterable[Claim]) -> list[str]:
     return missing
 
 
+class ExtractionFailed(RuntimeError):
+    """A chunk produced nothing usable. Raised rather than returned as an empty list, because a
+    silent empty result reads as 'no numbers here' and hides a truncated or rejected response."""
+
+
 @dataclass
 class ExtractionStats:
     """What the run did, so a caller can see drops rather than infer them from a short list."""
@@ -526,6 +588,81 @@ class ExtractionStats:
     # Claims the first pass missed and the coverage sweep recovered. Non-zero here is the
     # measurement of how often extraction under-reads; it should be reported, not hidden.
     recovered_by_sweep: int = 0
+    # The same number claimed twice out of one sentence. D-2's prompt asks for one claim per
+    # number; this counts the times the model did not comply and the code had to enforce it.
+    #
+    # Read this as an order of magnitude, not an exact count. `extract_sources` calls `_assemble`
+    # once for the first pass and again over the whole accumulated list after the coverage sweep,
+    # sharing one stats object, so every drop counter here — this one, `dropped_duplicate` and
+    # `dropped_unlocatable` alike — sees the first pass twice. Pre-existing; noted so the number is
+    # not mistaken for exact. The page measures repeats from the report instead, which is a count
+    # of what actually shipped.
+    dropped_same_sentence_repeat: int = 0
+
+
+# A sentence ends at .!? followed by whitespace or end-of-text. The lookahead matters: without it
+# a decimal ("3.11") would read as a sentence boundary and split one sentence into two, which would
+# silently disable the repeat guard below on exactly the market-rate claims it most needs to hold.
+_SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
+
+
+def _sentence_index(text: str, position: int) -> int:
+    """How many sentences end before `position`. Equal values mean the same sentence."""
+    return sum(1 for m in _SENTENCE_END.finditer(text) if m.start() < position)
+
+
+def sentence_index_of_quote(source: Source, quote: str) -> int | None:
+    """Which sentence of `source` a verbatim quote sits in, or None if it is not found.
+
+    Public so the reviewer page can measure repeats with the SAME definition of a sentence the
+    extractor deduplicates on. Two definitions would drift, and the page would end up reporting a
+    defect the code had already made impossible -- or missing one it had not.
+    """
+    span = locate(source.text, quote)
+    if span is None:
+        return None
+    return _sentence_index(source.text, span[0])
+
+
+def _drop_same_sentence_repeats(
+    source: Source,
+    located: list[tuple[int, "Claim"]],
+    stats: ExtractionStats,
+) -> list[tuple[int, "Claim"]]:
+    """Enforce ONE CLAIM PER NUMBER within a sentence, keeping the most informative quote.
+
+    D-2 removed a prompt line that told the extractor to merge, and told it to quote the clause
+    around each number instead. It over-corrected: the live run split "Say you go sixty forty,
+    sixty percent stocks and forty percent bonds" into four claims, sixty and forty twice each.
+    `_assemble` dedupes by span and those spans genuinely differ, so nothing caught it.
+
+    A prompt cannot be the guard here. The prompt already says one claim per number, and the model
+    does not always comply -- the project's rule is that the model reads and the code decides, so
+    the rule is enforced here instead of asked for again.
+
+    Scope is deliberately one sentence. A number repeated in a LATER sentence is almost always a
+    real second claim ("Raise it one point." then "One point a year is invisible"), and 24 of the
+    26 repeats in the last corpus scan were exactly that. Dropping those would destroy data.
+    """
+    best: dict[tuple[int, float | None, str], tuple[int, "Claim"]] = {}
+    order: list[tuple[int, float | None, str]] = []
+
+    for start, claim in located:
+        key = (_sentence_index(source.text, start), claim.value, claim.claim_type)
+        if key not in best:
+            best[key] = (start, claim)
+            order.append(key)
+            continue
+        stats.dropped_same_sentence_repeat += 1
+        # Keep the FIRST mention, not the longest. Keeping the longest reads better in isolation
+        # and measurably loses data: on `corpus/scripts/fresh_wrong.md` the sentence "If you assume
+        # a 10% return on that ... though I want to be clear that 10% is a number I picked" has the
+        # longer quote on the disclaimer, and preferring it dropped labelled row 54 and took
+        # extraction recall from 46/54 to 45/54. The labelled set records one row per such
+        # sentence and anchors it on the first mention, so first is also the convention a human
+        # reader already applied to this corpus.
+
+    return [best[key] for key in order]
 
 
 def _assemble(
@@ -570,6 +707,7 @@ def _assemble(
         ))
 
     located.sort(key=lambda pair: pair[0])
+    located = _drop_same_sentence_repeats(source, located, stats)
     return [claim for _, claim in located]
 
 

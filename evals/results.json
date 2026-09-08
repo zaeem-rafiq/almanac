@@ -1,0 +1,226 @@
+{
+  "run_at": "2026-09-08T01:53:14+00:00",
+  "gate": {
+    "passed": true,
+    "failures": [],
+    "hard_negative_fp_ceiling": 0,
+    "stale_material_recall_floor": 0.9
+  },
+  "run": {
+    "sources_read": [
+      "corpus/channel/v1-401k-limits-explained/captions.srt",
+      "corpus/channel/v2-mortgage-or-invest/captions.srt",
+      "corpus/channel/v3-hsa-triple-tax-advantage/captions.srt",
+      "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "corpus/channel/v5-ibonds-vs-high-yield-savings/captions.srt",
+      "corpus/scripts/fresh_ok.md",
+      "corpus/scripts/fresh_wrong.md"
+    ],
+    "verdicts_produced": 111,
+    "labelled_rows": 54,
+    "matched": 46,
+    "unmatched_labels": 8,
+    "unlocatable_labels": 0,
+    "unmatched_verdicts": 65,
+    "min_label_coverage": 0.9,
+    "sensitivity": {
+      "0.50": 52,
+      "0.70": 48,
+      "0.90": 46,
+      "1.00": 46
+    },
+    "extraction": "live"
+  },
+  "extraction_recall": 0.8518518518518519,
+  "claim_type": {
+    "accuracy": 0.9782608695652174,
+    "hits": 45,
+    "of": 46,
+    "confusion": [
+      {
+        "expected": "historical",
+        "got": "historical",
+        "n": 1
+      },
+      {
+        "expected": "illustrative",
+        "got": "illustrative",
+        "n": 19
+      },
+      {
+        "expected": "illustrative",
+        "got": "other",
+        "n": 1
+      },
+      {
+        "expected": "market_rate",
+        "got": "market_rate",
+        "n": 4
+      },
+      {
+        "expected": "statutory_limit",
+        "got": "statutory_limit",
+        "n": 18
+      },
+      {
+        "expected": "structural",
+        "got": "structural",
+        "n": 3
+      }
+    ]
+  },
+  "status_scores": [
+    {
+      "status": "skip",
+      "precision": 1.0,
+      "recall": 0.75,
+      "true_positives": 24,
+      "false_positives": 0,
+      "false_negatives": 8,
+      "support": 32,
+      "not_extracted": 8
+    },
+    {
+      "status": "correct",
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 9,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "support": 9,
+      "not_extracted": 0
+    },
+    {
+      "status": "stale_material",
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 7,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "support": 7,
+      "not_extracted": 0
+    },
+    {
+      "status": "stale_immaterial",
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 2,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "support": 2,
+      "not_extracted": 0
+    },
+    {
+      "status": "unresolved",
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 4,
+      "false_positives": 0,
+      "false_negatives": 0,
+      "support": 4,
+      "not_extracted": 0
+    }
+  ],
+  "status_confusion": [
+    {
+      "expected": "correct",
+      "got": "correct",
+      "n": 9
+    },
+    {
+      "expected": "skip",
+      "got": "<not extracted>",
+      "n": 8
+    },
+    {
+      "expected": "skip",
+      "got": "skip",
+      "n": 24
+    },
+    {
+      "expected": "stale_immaterial",
+      "got": "stale_immaterial",
+      "n": 2
+    },
+    {
+      "expected": "stale_material",
+      "got": "stale_material",
+      "n": 7
+    },
+    {
+      "expected": "unresolved",
+      "got": "unresolved",
+      "n": 4
+    }
+  ],
+  "hard_negatives": {
+    "labelled": 28,
+    "matched": 21,
+    "false_positives": 0,
+    "claim_types": [
+      "historical",
+      "illustrative"
+    ],
+    "rows": [],
+    "stale_verdicts_outside_labelled_set": 0
+  },
+  "misses": [],
+  "not_extracted": [
+    {
+      "line": 7,
+      "source": "corpus/channel/v1-401k-limits-explained/captions.srt",
+      "quote": "Six percent is four thousand two hundred dollars of your own money",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 25,
+      "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "quote": "Ten thousand dollars. It showed up, it is yours",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 29,
+      "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "quote": "Whatever is left goes into three funds. Not thirty. Three.",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 30,
+      "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "quote": "Say you go sixty forty, sixty percent stocks and forty percent bonds",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 31,
+      "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "quote": "Or eighty twenty if you are younger",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 33,
+      "source": "corpus/channel/v4-how-id-invest-10000/captions.srt",
+      "quote": "Over thirty years, at that assumed rate, a lump sum roughly doubles about three and a half times",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    },
+    {
+      "line": 39,
+      "source": "corpus/channel/v5-ibonds-vs-high-yield-savings/captions.srt",
+      "quote": "If you cash out before five years you give up three months of interest",
+      "expected_status": "skip",
+      "expected_claim_type": "structural"
+    },
+    {
+      "line": 52,
+      "source": "corpus/scripts/fresh_wrong.md",
+      "quote": "Say you make $50,000 and your plan matches the first 5%",
+      "expected_status": "skip",
+      "expected_claim_type": "illustrative"
+    }
+  ]
+}
