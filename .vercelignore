@@ -1,0 +1,18 @@
+# A-09: keep the function bundle to the app and the data it reads.
+# evals/ is NOT excluded: web/app.py builds MEASURED from evals/results.json and
+# evals/reproducibility.json at import, so excluding it 500s every route, not just the table.
+venv/
+tests/
+renders/
+scripts/
+docs/
+.claude/
+.github/
+__pycache__/
+*.pyc
+token.json
+.env*
+# When a .vercelignore exists the Vercel CLI stops consulting .gitignore, so anything
+# gitignored must be named again here or `vercel deploy` uploads it.
+client_secret.json
+

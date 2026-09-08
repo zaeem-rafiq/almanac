@@ -28,7 +28,7 @@ ALLOWED_UNGROUNDED = {
 GROUNDING_SOURCES = [
     "evals/results.json", "evals/reproducibility.json", "almanac/judge.py", "almanac/catalog.py",
     "almanac/extract.py", "facts/catalog.yaml", "facts/rates.json", "reports/latest.json",
-    "requirements.txt",
+    "requirements.txt", "almanac/youtube.py", ".github/workflows/nightly.yml",
 ]
 
 NUM = re.compile(r"(?<![A-Za-z_])\$?-?\d[\d,]*(?:\.\d+)?%?(?![A-Za-z_])")

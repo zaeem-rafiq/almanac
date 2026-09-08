@@ -8,9 +8,8 @@ flowchart TB
   classDef code  fill:#eef4fb,stroke:#31577f,stroke-width:1.6px,color:#16324f;
   classDef data  fill:#f3f3f0,stroke:#8a8a80,stroke-width:1.3px,color:#3a3a34;
   classDef guard fill:#fbeeee,stroke:#8c2f2f,stroke-width:1.6px,color:#5c1a1a;
-  classDef stub  fill:#f7f7f7,stroke:#9a9a9a,stroke-width:1.3px,stroke-dasharray:5 4,color:#5a5a5a;
 
-  nightly["<b>nightly GitHub Action</b><br/>stub today — manual dispatch only"]:::stub
+  nightly["<b>nightly GitHub Action</b><br/>0 7 * * * - refresh rates, scan,<br/>commit the report"]:::code
   cliRun["<b>cli.py</b><br/>scan · lint · eval"]:::code
 
   src["<b>captions / script</b><br/>corpus/ · YouTube Data API v3"]:::data

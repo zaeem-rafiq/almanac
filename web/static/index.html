@@ -411,6 +411,15 @@ button:disabled{opacity:.45;cursor:default}
   function renderMeasured(m) {
     var dl = $("measured");
     dl.textContent = "";
+    // A deploy can legitimately arrive without the eval artifacts (they are excluded from the
+    // function bundle). Say so plainly rather than painting "undefined" into the table.
+    if (m.figures_available === false) {
+      dl.appendChild(el("dt", null, "Measured figures"));
+      dl.appendChild(el("dd", null, "not shipped with this deployment — see evals/ in the repo"));
+      $("attrib").textContent = "This deployment did not ship the eval artifacts, so no measured " +
+        "figure is shown. The page will not display a number it cannot source. (" + m.source + ")";
+      return;
+    }
     var rows = [
       ["Judge — status disagreements", m.judge_status_disagreements],
       ["stale_material precision / recall", m.stale_material_precision + " / " + m.stale_material_recall],

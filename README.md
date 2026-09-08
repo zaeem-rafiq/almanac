@@ -14,7 +14,7 @@ reads. The code decides. Every verdict carries the rule that produced it.
 
 ## Try it in 60 seconds
 
-**Hosted:** _not deployed yet_ — the Vercel deploy is open in [PR #6](https://github.com/zaeem-rafiq/almanac/pull/6) and needs a `vercel login` plus three repo secrets. There is no live URL to give you yet, and this README will not invent one. Everything below runs locally and is the same engine.
+**Hosted:** _not live yet._ The deploy landed in [#6](https://github.com/zaeem-rafiq/almanac/pull/6) — `vercel.json`, `api/index.py`, a scheduled nightly scan and a keepalive are all in this tree. What has not happened is the one-time `vercel deploy --prod` and the `ALMANAC_URL` that follows it, so **there is still no URL, and this README will not invent one.** The remaining steps are `docs/A-09-zaeem-checklist.md` steps 2 and 4. Everything below runs locally, on the same engine the host will run.
 
 ```bash
 git clone https://github.com/zaeem-rafiq/almanac.git && cd almanac
@@ -36,12 +36,14 @@ gcloud auth application-default login
 No API key is stored for that path — it uses Application Default Credentials. `.env.example`
 comments every variable, and there is no `ANTHROPIC_API_KEY` in it.
 
-To see the reviewer page instead:
+To see the reviewer page instead — a scan ships in the repo, so this needs nothing else:
 
 ```bash
-python -m almanac scan --source corpus
 python -m uvicorn web.app:app --port 8000
 ```
+
+`reports/latest.json` is tracked (the nightly Action commits its own output), so the page has
+verdicts on a fresh clone. `python -m almanac scan --source corpus` regenerates it.
 
 ---
 
@@ -218,8 +220,12 @@ The middle and bottom rows are the product. Anything can find a stale number; no
   `ALMANAC_WRITE=true` **and** the target channel equals `ALMANAC_TEST_CHANNEL_ID` **and** the CLI
   was given `--apply`. Anything else prints the diff and exits. The web layer has no `--apply` and
   never constructs a YouTube client.
-* **The nightly Action is a stub.** `.github/workflows/nightly.yml` exists as a manual-dispatch
-  no-op. The pipeline it will run is real and runs today from the CLI; the schedule is not wired.
+* **The nightly Action is wired but has not run yet.** `.github/workflows/nightly.yml` is a real
+  job on a `0 7 * * *` schedule that refreshes the rates, scans, and commits its own report — no
+  longer the manual-dispatch no-op it was before [#6](https://github.com/zaeem-rafiq/almanac/pull/6).
+  It is nightly and no more often on purpose: `captions.download` costs 200 quota units per video,
+  so a five-video YouTube scan is about 1,250 against a 10,000/day budget. As of this writing it has
+  **zero runs** — the schedule is set, the evidence that it works on a runner is not in yet.
 * **The manual facts change about once a year, and they are tested for it.** Every `source: manual`
   entry in `facts/catalog.yaml` is human-supplied with an IRS/SSA/TreasuryDirect URL — the agent
   may scaffold a row, it may not fill a value. `catalog.py` carries `MANUAL_MAX_AGE_DAYS = 395`,
@@ -255,7 +261,9 @@ The middle and bottom rows are the product. Anything can find a stale number; no
 | reviewer page | FastAPI + `uvicorn`, one static page, read-only |
 | tests | `pytest` — `pytest tests/ -q` |
 
-Exact pins in [`requirements.txt`](requirements.txt); how each API signature was verified in
+Exact pins in [`requirements.txt`](requirements.txt) — that file is the **runtime** set the host
+and the nightly job install, so `pytest` is deliberately not in it; install it separately to run the
+suite. How each API signature was verified is in
 [`docs/decisions/ADR-000-stack.md`](docs/decisions/ADR-000-stack.md).
 
 | Path | Role |
