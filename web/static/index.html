@@ -209,18 +209,18 @@ button:disabled{opacity:.45;cursor:default}
       <dl class="measured" id="measured"></dl>
       <div class="caveat">
         <h3>And what it is not</h3>
-        <p><strong>Extraction is not reproducible.</strong> It is a model call, and a model call
-          does not promise to repeat itself. The sampling controls this engine exposes are pinned,
-          but a pinned sample is still a sample &mdash; so the guarantee is not requested from the
-          vendor, it is enforced in code: a coverage sweep re-reads any number-bearing sentence the
-          first pass produced no claim for, and every quote is checked to be a verbatim substring
-          of its source.</p>
-        <p><strong>The figures beside this are post-sweep</strong>, measured on a live run of the
-          engine that ships. What is thin is the sample behind the reproducibility claim: six
-          consecutive gate passes, not the twelve planned &mdash; the run was cut short
-          (<span class="mono">docs/blockers/A-05.md</span>). Six supports roughly a 7% chance of a
-          lucky streak, where twelve would have put it near 0.5%. That gap is unmeasured, not
-          resolved.</p>
+        <p><strong>Extraction repeats itself &mdash; measured, not promised.</strong>
+          <span id="repro"></span>. The sampling controls this engine exposes are pinned, and on
+          this corpus that is now enough to make the run reproducible. It is still an observation
+          rather than a guarantee: <span id="repro-scope"></span></p>
+        <p><strong>It over-reads, and that is the cost of the guarantee.</strong>
+          <span id="defect"></span></p>
+        <p><strong>The other number on record is not this engine's.</strong>
+          <span class="mono">ADR-002</span> reports six consecutive gate passes taken before the
+          extractor moved to this model; that engine was retired at
+          <span class="mono">038dbe6</span>. Those runs measured software that no longer runs here,
+          so they are not pooled with anything above &mdash; a twelve-run figure spanning both would
+          describe no engine that exists.</p>
         <p>So this page does not claim every number gets caught. It claims that what the judge
           ruled, it ruled from a rule you can read.</p>
       </div>
@@ -426,6 +426,12 @@ button:disabled{opacity:.45;cursor:default}
     var attrib = "Every figure above was measured by " + m.source +
       ". Nothing on this page quotes a number that run did not produce.";
     attrib += " " + m.unmeasured;   // always disclosed: the run's own blind spot
+    // The caveat panel is rendered, never hard-coded: every claim it makes about reproducibility
+    // and over-reading has to come from the artifacts, or it can go stale exactly the way the
+    // videos this tool checks go stale.
+    $("repro").textContent = m.reproducibility;
+    $("repro-scope").textContent = m.reproducibility_scope;
+    $("defect").textContent = m.known_defect;
     $("attrib").textContent = attrib;
   }
 

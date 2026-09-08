@@ -510,3 +510,65 @@ Three specific risks, all unmeasured:
 compare against the post-sweep baseline in D-5 (6/6 gate, `stale_material` 7/7, matched 45–48). If
 `matched` rises toward 51 with the gate still green, D-2 is fixed. If the gate flaps or
 `stale_material` drops, revert the prompt and re-open this decision.
+
+---
+
+## D-5, closed on the shipping engine — 2026-09-07
+
+**Status:** MEASURED · artifact: `evals/reproducibility.json`
+
+D-5 recorded that extraction was not reproducible: verdict counts moved 65–84 between runs and the
+gate failed 2 runs in 5. The instruction left in this document was to run `almanac eval` six more
+times and pool the result with the 6/6 post-sweep block to reach a 12-run sample. **That
+instruction is void, and following it would have produced a fabricated statistic.**
+
+### Why the two blocks cannot be pooled
+
+The 6/6 post-sweep sample was taken on Anthropic `claude-opus-5`. The extractor moved to
+`gemini-3.8-flash` on Vertex at `038dbe6`, 73 minutes after the 6/6 section was written
+(`54b6e06`). `git show 54b6e06:almanac/extract.py` shows `_client()` building
+`anthropic.Anthropic` at that commit. A 12-run figure spanning both would describe no engine that
+exists — and the ~7% chance-of-a-lucky-streak figure is anchored on a pre-sweep failure rate
+(4 in 11) itself measured on the retired model, so it is not a valid null for these runs either.
+
+### What the shipping engine actually does
+
+Six consecutive live runs (`--out` to separate directories, no `--cache`, 137–151 s each):
+
+| | claude-opus-5, post-sweep | gemini-3.8-flash |
+|---|---|---|
+| gate PASS | 6 / 6 | **6 / 6** |
+| verdict count | 76–84 (spread 8) | **115 every run (spread 0)** |
+| `matched` | 45–48 | **46 every run** |
+| `stale_material` recall | 7/7 | **1.00 every run** |
+| distinct scored outputs | not recorded | **1** |
+
+The six scored outputs are **byte-identical** — SHA-256 of each `results.json` with `run_at`
+removed is the same digest six times. This is stronger than "the gate is stable": the run is
+reproducible. `temperature=0.0` and a pinned `seed`, neither of which the previous engine accepted,
+are the difference.
+
+### What must still NOT be claimed
+
+1. **This is a measurement, not a guarantee.** One corpus, one region, one model version, one hour.
+   Google does not promise determinism for a pinned temperature and seed. A model revision could
+   change it without notice.
+2. **The engine over-reads.** 26 of the 85 verdicts in the last corpus scan re-read a number the
+   pipeline had already claimed from the same source — one sentence becoming several verdicts
+   (*"Say you go sixty forty, sixty percent stocks and forty percent bonds"* → four). This is the
+   coverage sweep's cost, and it means **D-2's one-claim-per-number rule is applied but NOT
+   holding**. D-2 should be reopened.
+3. **No false correction reaches a creator, and that part is measured.** All 26 repeats are
+   discarded by `judge.py` as `skip` via `R2.unjudged_claim_type`, which is deterministic rule code
+   with no model call. Duplicate `stale_*` corrections in the last scan: **0**. All 85 quotes are
+   verbatim in their cited source under the repo's own `extract._normalise` (85/85; the control
+   confirms a fabricated quote does not match).
+
+### Correction to this document
+
+`evals/results.md` is no longer from a pre-sweep run — `fb837d1` regenerated it, and it now matches
+`evals/results.json` at 23:50 UTC. The note at the end of the 6/6 section is stale.
+
+**Also missing, and worth fixing:** no eval artifact records which engine produced it. `to_payload`
+writes `run_at` but no model field, so engine attribution for any past run rests on commit ordering
+rather than on the record itself. That is why the 6/6 block above could be misread as this engine's.

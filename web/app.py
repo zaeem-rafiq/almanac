@@ -72,15 +72,53 @@ NOTE_MARKER = "📌"
 # non-reproducibility that was false on both engines. Reading evals/results.json makes the promise
 # structural — the page cannot quote a number no run produced, because it has no number of its own.
 EVAL_RESULTS = Path(__file__).resolve().parents[1] / "evals" / "results.json"
+REPRODUCIBILITY = Path(__file__).resolve().parents[1] / "evals" / "reproducibility.json"
 
 
 def _pct(x: float) -> str:
     return f"{round(x * 100)}%"
 
 
+def _over_extraction() -> dict:
+    """Measure how often the extractor re-reads a number it has already claimed.
+
+    Read from the last scan rather than stated as prose: the coverage sweep guarantees completeness
+    by re-reading number-bearing sentences, and the price of that guarantee is repeats. The page has
+    to name the price, not just the guarantee.
+
+    `reports/latest.json` is a gitignored build artifact, so it can legitimately be absent (a fresh
+    clone, or a deploy that has not scanned yet). MEASURED is built at import, so a missing report
+    must not stop the app from starting -- it degrades to `measured: False` and the copy adapts.
+    """
+    if not REPORT_PATH.is_file():
+        return {"measured": False, "verdicts": 0, "repeats": 0, "surfaced_duplicates": 0}
+    try:
+        rep = json.loads(REPORT_PATH.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"measured": False, "verdicts": 0, "repeats": 0, "surfaced_duplicates": 0}
+
+    verdicts = repeats = surfaced_dupes = 0
+    for video in rep.get("videos", []):
+        seen: dict[tuple, int] = {}
+        surfaced: dict[tuple, int] = {}
+        for v in video.get("verdicts", []):
+            verdicts += 1
+            key = (v.get("claimed_value"), v.get("claim_type"))
+            seen[key] = seen.get(key, 0) + 1
+            if str(v.get("status", "")).startswith("stale_"):
+                skey = (v.get("claimed_value"), v.get("entity_key"))
+                surfaced[skey] = surfaced.get(skey, 0) + 1
+        repeats += sum(n - 1 for n in seen.values() if n > 1)
+        surfaced_dupes += sum(n - 1 for n in surfaced.values() if n > 1)
+    return {"measured": True, "verdicts": verdicts, "repeats": repeats,
+            "surfaced_duplicates": surfaced_dupes}
+
+
 def _load_measured() -> dict:
     """Derive the page's quotable figures from the committed eval run."""
     raw = json.loads(EVAL_RESULTS.read_text(encoding="utf-8"))
+    rep = json.loads(REPRODUCIBILITY.read_text(encoding="utf-8"))
+    over = _over_extraction()
     by_status = {row["status"]: row for row in raw["status_scores"]}
     run, hn = raw["run"], raw["hard_negatives"]
     stale = by_status["stale_material"]
@@ -102,19 +140,38 @@ def _load_measured() -> dict:
         "judge_status_disagreements": (
             f"{len(raw['misses'])} on {run['matched']} matched rows, across all five statuses"
         ),
-        # Extraction is a model call and does not repeat itself. This model exposes temperature and
-        # a seed, and both are pinned — but a pinned sample is still a sample, so the claim below is
-        # about what is ENFORCED, not what is hoped for.
-        "extraction_reproducible": False,
+        # Reproducibility is now MEASURED rather than assumed, so it is read from the sampling
+        # artifact instead of asserted here. The old hard-coded `False` was written when extraction
+        # ran on claude-opus-5 and genuinely did vary; on the current engine six consecutive live
+        # runs produced byte-identical scored output. Neither the old claim nor the new one may be
+        # a literal in this file — that is the drift this page exists to catch.
+        "reproducibility": (
+            f"{rep['gate_passes']}/{rep['gate_runs']} gate PASS, and "
+            f"{'identical' if rep['identical_across_runs'] else 'differing'} scored output across "
+            f"all {rep['gate_runs']} runs"
+        ),
+        "extraction_repeats_identically": rep["identical_across_runs"],
+        "reproducibility_scope": rep["scope_of_the_claim"],
         "extraction_variance": (
             f"{run['verdicts_produced']} verdicts this run; {run['unmatched_verdicts']} of them have "
             f"no labelled row, so the eval set covers part of what the pipeline emits"
         ),
         "known_defect": (
-            "Extraction is a model call and is not guaranteed to repeat itself. Determinism is "
-            "enforced in code rather than requested: a coverage sweep re-reads any number-bearing "
-            "sentence the first pass produced no claim for, and every quote above is checked to be "
-            "a verbatim substring of its source."
+            (
+                f"The extractor splits: {over['repeats']} of the {over['verdicts']} verdicts in the "
+                f"last scan re-read a number this pipeline had already claimed from the same "
+                f"source, so read counts run ahead of what a person would count as distinct "
+                f"claims. Every one of those repeats is discarded by the judge as skip, and "
+                f"{over['surfaced_duplicates']} duplicate corrections reached the report — but the "
+                f"coverage sweep that guarantees completeness is what causes it, and it is not "
+                f"fixed."
+            )
+            if over["measured"]
+            else (
+                "The extractor splits: it can re-read a number it has already claimed from the "
+                "same sentence, so read counts run ahead of distinct claims. No scan artifact is "
+                "on disk here, so this page cannot say by how much in this deployment."
+            )
         ),
         "figures_predate_the_sweep": False,
         "sweep_measured_here": True,

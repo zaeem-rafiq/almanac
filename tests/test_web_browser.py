@@ -131,12 +131,24 @@ def test_page_renders_with_zero_console_errors(browser, base_url: str, label: st
     # are pinned, and evals/results.json is a post-sweep run. A test may not require the page to
     # keep saying something untrue, so they are replaced by what the page must now stand behind --
     # the guarantee actually enforced in code, and the thinness of the sample behind it.
-    assert "not reproducible" in body
+    # "not reproducible" was the panel's headline while extraction ran on claude-opus-5. Six
+    # consecutive live runs on the shipping engine produced byte-identical scored output
+    # (evals/reproducibility.json), so asserting it now would force the page to understate a
+    # measured result. What replaces it is the claim the page must still stand behind: the
+    # over-reading it does, and its refusal to pool the retired engine's sample.
+    assert "measured, not promised" in body
+    assert "over-reads" in body
     assert "coverage sweep" in body
     assert "consecutive gate passes" in body
-    assert "has not been applied" not in body  # the retracted sampling-parameter claim
+    assert "not pooled" in body
+    # These three pin the RETRACTED claims themselves. A blanket ban on the word "temperature"
+    # used to stand here; it was a crude proxy and it now blocks true copy -- the scope caveat
+    # correctly says the vendor does not promise determinism for a pinned temperature and seed.
+    # Ban the false statements, not the vocabulary.
+    assert "has not been applied" not in body
     assert "no sampling control" not in body
-    assert "temperature" not in body.lower()
+    assert "api default of 1.0" not in body.lower()
+    assert "does not promise determinism" in body   # the true statement must survive
 
     # No horizontal overflow at either width — "mobile-readable at 390px" is a measurement.
     overflow = page.evaluate(

@@ -157,8 +157,20 @@ def test_page_quotes_only_measured_figures(client: TestClient) -> None:
     assert measured["stale_material_recall"] == f"{by_status['stale_material']['recall']:.2f}"
     assert measured["skip_recall"] == f"{by_status['skip']['recall']:.2f}"
 
-    # Extraction is a model call; the page must not imply it repeats itself.
-    assert measured["extraction_reproducible"] is False
+    # Reproducibility is measured now, not assumed, so the page is checked against the sampling
+    # artifact rather than against a literal. This assertion used to read
+    # `measured["extraction_reproducible"] is False`, which was true of claude-opus-5 (verdict
+    # counts moved 65-84 run to run, gate failed 2 in 5) and is false of the engine that ships:
+    # six consecutive live runs produced byte-identical scored output. Pinning the old value would
+    # force the page to keep understating a result it can now evidence.
+    repro = json.loads((_P(__file__).resolve().parents[1] / "evals" / "reproducibility.json").read_text())
+    assert measured["extraction_repeats_identically"] is repro["identical_across_runs"]
+    assert str(repro["gate_passes"]) in measured["reproducibility"]
+    assert str(repro["gate_runs"]) in measured["reproducibility"]
+    assert measured["reproducibility_scope"] == repro["scope_of_the_claim"]
+
+    # The scope caveat is the load-bearing half of the claim: a pinned sample is still a sample.
+    assert "not a vendor guarantee" in measured["reproducibility_scope"]
 
     # The defect statement must name what is actually enforced, not a sampling knob. ADR-000 §10:
     # claude-opus-5 accepted no sampling control at all, and the engine has since moved to Gemini
@@ -171,14 +183,24 @@ def test_page_quotes_only_measured_figures(client: TestClient) -> None:
     assert measured["sweep_measured_here"] is True
 
     page = client.get("/").text
-    assert "not reproducible" in page
+
+    # The panel must still disclose the engine's real defect and refuse to pool the retired
+    # engine's sample. "not reproducible" is deliberately NOT asserted any more -- it was the old
+    # copy's headline and the measurement now contradicts it.
+    assert "over-reads" in page
+    assert "038dbe6" in page          # the retired engine is named, not quietly dropped
+    assert "not pooled" in page
 
     # Regression guard on the retracted claim. It was false twice over — the parameter does not
     # exist on the model it named, and a different fix already landed — and it sat in the panel the
     # page's credibility rests on, so it must not come back.
+    # These three pin the RETRACTED claims themselves. A blanket ban on the word "temperature"
+    # used to stand here; it was a crude proxy and it now blocks true copy -- the scope caveat
+    # correctly says the vendor does not promise determinism for a pinned temperature and seed.
+    # Ban the false statements, not the vocabulary.
     assert "has not been applied" not in page
     assert "API default of 1.0" not in page
-    assert "temperature" not in page.lower()
+    assert "no sampling control" not in page
 
 
 # ---------------------------------------------------------------------------------- /api/lint
