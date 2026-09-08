@@ -1,6 +1,5 @@
 {
-  "measured_at": "2026-09-08T01:15:07+00:00",
-  "commit": "6a9f6ea0fc04c7ec50c050d0002267bf64252909",
+  "measured_at": "2026-09-08T01:58:38+00:00",
   "engine": {
     "model": "gemini-3.8-flash",
     "vendor": "google-vertex",
@@ -8,85 +7,115 @@
     "seed": 20260908,
     "note": "sampling controls pinned in almanac/extract.py"
   },
-  "method": "six consecutive `almanac eval` runs, each with live extraction (no --cache), each writing its own --out directory",
-  "runs": [
+  "method": "consecutive `almanac eval` runs, live extraction (no --cache), each to its own --out directory. Blocks are keyed on the SHA-256 of almanac/extract.py rather than a commit, because reproducibility is a property of the extraction code: if that file changes, the measurement below no longer describes what ships.",
+  "blocks": [
     {
-      "n": 7,
-      "gate_passed": true,
-      "extraction": "live",
-      "verdicts_produced": 115,
-      "matched": 46,
-      "labelled_rows": 54,
-      "extraction_recall": 0.8518518518518519,
-      "stale_material_recall": 1.0,
-      "hard_negative_false_positives": 0,
-      "scored_output_sha256": "1609679577450fa21d11e5bae27d04e01b8b215c0619a9faf9127e8e80a96dd6"
+      "label": "before the D-2 same-sentence guard",
+      "extract_py_sha256": "fefaf63519b39ec5",
+      "note": "the sweep could claim one number twice from a single sentence",
+      "runs": [
+        {
+          "n": 7,
+          "gate_passed": true,
+          "verdicts_produced": 115,
+          "matched": 46,
+          "extraction_recall": 0.8518518518518519,
+          "stale_material_recall": 1.0,
+          "hard_negative_false_positives": 0
+        },
+        {
+          "n": 8,
+          "gate_passed": true,
+          "verdicts_produced": 115,
+          "matched": 46,
+          "extraction_recall": 0.8518518518518519,
+          "stale_material_recall": 1.0,
+          "hard_negative_false_positives": 0
+        },
+        {
+          "n": 9,
+          "gate_passed": true,
+          "verdicts_produced": 115,
+          "matched": 46,
+          "extraction_recall": 0.8518518518518519,
+          "stale_material_recall": 1.0,
+          "hard_negative_false_positives": 0
+        },
+        {
+          "n": 10,
+          "gate_passed": true,
+          "verdicts_produced": 115,
+          "matched": 46,
+          "extraction_recall": 0.8518518518518519,
+          "stale_material_recall": 1.0,
+          "hard_negative_false_positives": 0
+        },
+        {
+          "n": 11,
+          "gate_passed": true,
+          "verdicts_produced": 115,
+          "matched": 46,
+          "extraction_recall": 0.8518518518518519,
+          "stale_material_recall": 1.0,
+          "hard_negative_false_positives": 0
+        },
+        {
+          "n": 12,
+          "gate_passed": true,
+          "verdicts_produced": 115,
+          "matched": 46,
+          "extraction_recall": 0.8518518518518519,
+          "stale_material_recall": 1.0,
+          "hard_negative_false_positives": 0
+        }
+      ],
+      "gate_passes": 6,
+      "gate_runs": 6,
+      "distinct_scored_outputs": 1,
+      "identical_within_block": true
     },
     {
-      "n": 8,
-      "gate_passed": true,
-      "extraction": "live",
-      "verdicts_produced": 115,
-      "matched": 46,
-      "labelled_rows": 54,
-      "extraction_recall": 0.8518518518518519,
-      "stale_material_recall": 1.0,
-      "hard_negative_false_positives": 0,
-      "scored_output_sha256": "1609679577450fa21d11e5bae27d04e01b8b215c0619a9faf9127e8e80a96dd6"
-    },
-    {
-      "n": 9,
-      "gate_passed": true,
-      "extraction": "live",
-      "verdicts_produced": 115,
-      "matched": 46,
-      "labelled_rows": 54,
-      "extraction_recall": 0.8518518518518519,
-      "stale_material_recall": 1.0,
-      "hard_negative_false_positives": 0,
-      "scored_output_sha256": "1609679577450fa21d11e5bae27d04e01b8b215c0619a9faf9127e8e80a96dd6"
-    },
-    {
-      "n": 10,
-      "gate_passed": true,
-      "extraction": "live",
-      "verdicts_produced": 115,
-      "matched": 46,
-      "labelled_rows": 54,
-      "extraction_recall": 0.8518518518518519,
-      "stale_material_recall": 1.0,
-      "hard_negative_false_positives": 0,
-      "scored_output_sha256": "1609679577450fa21d11e5bae27d04e01b8b215c0619a9faf9127e8e80a96dd6"
-    },
-    {
-      "n": 11,
-      "gate_passed": true,
-      "extraction": "live",
-      "verdicts_produced": 115,
-      "matched": 46,
-      "labelled_rows": 54,
-      "extraction_recall": 0.8518518518518519,
-      "stale_material_recall": 1.0,
-      "hard_negative_false_positives": 0,
-      "scored_output_sha256": "1609679577450fa21d11e5bae27d04e01b8b215c0619a9faf9127e8e80a96dd6"
-    },
-    {
-      "n": 12,
-      "gate_passed": true,
-      "extraction": "live",
-      "verdicts_produced": 115,
-      "matched": 46,
-      "labelled_rows": 54,
-      "extraction_recall": 0.8518518518518519,
-      "stale_material_recall": 1.0,
-      "hard_negative_false_positives": 0,
-      "scored_output_sha256": "1609679577450fa21d11e5bae27d04e01b8b215c0619a9faf9127e8e80a96dd6"
+      "label": "with the D-2 same-sentence guard",
+      "extract_py_sha256": "08beb5a3c5c88fe7",
+      "note": "repeats inside one sentence are dropped in code, keeping the first mention",
+      "runs": [
+        {
+          "n": 13,
+          "gate_passed": true,
+          "verdicts_produced": 111,
+          "matched": 46,
+          "extraction_recall": 0.8518518518518519,
+          "stale_material_recall": 1.0,
+          "hard_negative_false_positives": 0
+        },
+        {
+          "n": 14,
+          "gate_passed": true,
+          "verdicts_produced": 111,
+          "matched": 46,
+          "extraction_recall": 0.8518518518518519,
+          "stale_material_recall": 1.0,
+          "hard_negative_false_positives": 0
+        },
+        {
+          "n": 15,
+          "gate_passed": true,
+          "verdicts_produced": 111,
+          "matched": 46,
+          "extraction_recall": 0.8518518518518519,
+          "stale_material_recall": 1.0,
+          "hard_negative_false_positives": 0
+        }
+      ],
+      "gate_passes": 3,
+      "gate_runs": 3,
+      "distinct_scored_outputs": 1,
+      "identical_within_block": true
     }
   ],
-  "gate_passes": 6,
-  "gate_runs": 6,
-  "distinct_scored_outputs": 1,
+  "gate_passes": 9,
+  "gate_runs": 9,
   "identical_across_runs": true,
-  "scope_of_the_claim": "A measurement over six consecutive runs on one corpus, one region and one model version, taken within a single hour. It is not a vendor guarantee: Google does not promise determinism for a pinned temperature and seed, and a model revision could change the result without notice. What it rules out is the specific defect ADR-002 D-5 recorded on the previous engine, where verdict counts moved 65-84 between runs and the gate failed 2 runs in 5.",
-  "supersedes": "The 6/6 post-sweep sample in ADR-002 was measured on Anthropic claude-opus-5, retired at commit 038dbe6. Those runs and these cannot be pooled into a single 12-run sample."
+  "scope_of_the_claim": "Every run within each block produced byte-identical scored output, and the two blocks differ only where the D-2 guard changed what counts as a claim (115 verdicts to 111, with matched holding at 46 of 54). It is a measurement over one corpus, one region and one model version, not a vendor guarantee: Google does not promise determinism for a pinned temperature and seed, and a model revision could change it without notice. What it rules out is the defect ADR-002 D-5 recorded on the previous engine, where verdict counts moved 65-84 between runs and the gate failed 2 runs in 5.",
+  "supersedes": "The 6/6 post-sweep sample in ADR-002 was measured on Anthropic claude-opus-5, retired at 038dbe6, and cannot be pooled with anything here."
 }

@@ -572,3 +572,63 @@ are the difference.
 **Also missing, and worth fixing:** no eval artifact records which engine produced it. `to_payload`
 writes `run_at` but no model field, so engine attribution for any past run rests on commit ordering
 rather than on the record itself. That is why the 6/6 block above could be misread as this engine's.
+
+---
+
+## D-2, second resolution — the guard is code now, not a prompt line
+
+**Status:** FIXED and MEASURED · `almanac/extract.py` · artifact: `evals/reproducibility.json`
+
+The first D-2 fix removed a merging instruction from the prompt and added `ONE CLAIM PER NUMBER,
+not per sentence`. It over-corrected: the live extractor split
+*"Say you go sixty forty, sixty percent stocks and forty percent bonds"* into four claims, sixty
+and forty twice each. `_assemble` dedupes by span and those spans genuinely differ, so nothing
+caught it.
+
+**A prompt could not be the guard.** The prompt already said the right thing and the model did not
+always comply. `_drop_same_sentence_repeats` now enforces it where the project's rule says it
+belongs — the model reads, the code decides.
+
+### The defect was 2, not 26
+
+The first measurement of this counted every repeat of a value within a source and reported 26. That
+conflated two different things, and 24 of the 26 were not defects:
+
+| | count | what it is |
+|---|---|---|
+| same number, **same sentence** | **2** | the D-2 defect — one claim split in two |
+| same number, **different sentences** | 24 | *"Raise it one point."* / *"One point a year is invisible"* — two real claims |
+
+Deduplicating the 24 would have destroyed data. Scope is one sentence for that reason.
+
+### Which repeat survives: the first, measured rather than assumed
+
+The obvious rule — keep the longest quote, since it reads better in an update note — **loses data**,
+and this was caught by running it, not by reasoning about it. `corpus/scripts/fresh_wrong.md` has
+one sentence carrying 10% twice: the assumption, then a disclaimer about the assumption. The longer
+quote is the disclaimer, so preferring it dropped labelled row 54 and took extraction recall from
+46/54 to 45/54. The labelled set records **one** row per such sentence and anchors it on the first
+mention, so *first* is also the convention a human already applied to this corpus.
+
+| rule | matched | recall | verdicts |
+|---|---|---|---|
+| before the guard | 46/54 | 0.852 | 115 |
+| keep the longest quote | **45/54** | 0.833 | 111 |
+| **keep the first mention** | **46/54** | **0.852** | **111** |
+
+Four redundant verdicts removed at no cost to recall, `stale_material` recall 1.00 and
+hard-negative false positives 0 throughout.
+
+### Determinism survives the change
+
+Three runs on the guarded extractor are byte-identical to each other (`59728cd5eb69785f`), as the
+six before it were to each other. `evals/reproducibility.json` keys each block on the SHA-256 of
+`almanac/extract.py` rather than a commit, because reproducibility is a property of that file: if
+it changes, the measurement no longer describes what ships. The blocks are **not** pooled — they
+differ exactly where the guard changed what counts as a claim.
+
+### What this still does not fix
+
+D-2 mechanism (ii) is untouched by design: labelled quotes that span a sentence boundary
+(*"Ten thousand dollars. It showed up, it is yours"*). The extractor quoting a single sentence is
+correct there, and the same-sentence guard cannot reach across the boundary either.

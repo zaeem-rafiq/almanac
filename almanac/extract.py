@@ -588,6 +588,81 @@ class ExtractionStats:
     # Claims the first pass missed and the coverage sweep recovered. Non-zero here is the
     # measurement of how often extraction under-reads; it should be reported, not hidden.
     recovered_by_sweep: int = 0
+    # The same number claimed twice out of one sentence. D-2's prompt asks for one claim per
+    # number; this counts the times the model did not comply and the code had to enforce it.
+    #
+    # Read this as an order of magnitude, not an exact count. `extract_sources` calls `_assemble`
+    # once for the first pass and again over the whole accumulated list after the coverage sweep,
+    # sharing one stats object, so every drop counter here — this one, `dropped_duplicate` and
+    # `dropped_unlocatable` alike — sees the first pass twice. Pre-existing; noted so the number is
+    # not mistaken for exact. The page measures repeats from the report instead, which is a count
+    # of what actually shipped.
+    dropped_same_sentence_repeat: int = 0
+
+
+# A sentence ends at .!? followed by whitespace or end-of-text. The lookahead matters: without it
+# a decimal ("3.11") would read as a sentence boundary and split one sentence into two, which would
+# silently disable the repeat guard below on exactly the market-rate claims it most needs to hold.
+_SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
+
+
+def _sentence_index(text: str, position: int) -> int:
+    """How many sentences end before `position`. Equal values mean the same sentence."""
+    return sum(1 for m in _SENTENCE_END.finditer(text) if m.start() < position)
+
+
+def sentence_index_of_quote(source: Source, quote: str) -> int | None:
+    """Which sentence of `source` a verbatim quote sits in, or None if it is not found.
+
+    Public so the reviewer page can measure repeats with the SAME definition of a sentence the
+    extractor deduplicates on. Two definitions would drift, and the page would end up reporting a
+    defect the code had already made impossible -- or missing one it had not.
+    """
+    span = locate(source.text, quote)
+    if span is None:
+        return None
+    return _sentence_index(source.text, span[0])
+
+
+def _drop_same_sentence_repeats(
+    source: Source,
+    located: list[tuple[int, "Claim"]],
+    stats: ExtractionStats,
+) -> list[tuple[int, "Claim"]]:
+    """Enforce ONE CLAIM PER NUMBER within a sentence, keeping the most informative quote.
+
+    D-2 removed a prompt line that told the extractor to merge, and told it to quote the clause
+    around each number instead. It over-corrected: the live run split "Say you go sixty forty,
+    sixty percent stocks and forty percent bonds" into four claims, sixty and forty twice each.
+    `_assemble` dedupes by span and those spans genuinely differ, so nothing caught it.
+
+    A prompt cannot be the guard here. The prompt already says one claim per number, and the model
+    does not always comply -- the project's rule is that the model reads and the code decides, so
+    the rule is enforced here instead of asked for again.
+
+    Scope is deliberately one sentence. A number repeated in a LATER sentence is almost always a
+    real second claim ("Raise it one point." then "One point a year is invisible"), and 24 of the
+    26 repeats in the last corpus scan were exactly that. Dropping those would destroy data.
+    """
+    best: dict[tuple[int, float | None, str], tuple[int, "Claim"]] = {}
+    order: list[tuple[int, float | None, str]] = []
+
+    for start, claim in located:
+        key = (_sentence_index(source.text, start), claim.value, claim.claim_type)
+        if key not in best:
+            best[key] = (start, claim)
+            order.append(key)
+            continue
+        stats.dropped_same_sentence_repeat += 1
+        # Keep the FIRST mention, not the longest. Keeping the longest reads better in isolation
+        # and measurably loses data: on `corpus/scripts/fresh_wrong.md` the sentence "If you assume
+        # a 10% return on that ... though I want to be clear that 10% is a number I picked" has the
+        # longer quote on the disclaimer, and preferring it dropped labelled row 54 and took
+        # extraction recall from 46/54 to 45/54. The labelled set records one row per such
+        # sentence and anchors it on the first mention, so first is also the convention a human
+        # reader already applied to this corpus.
+
+    return [best[key] for key in order]
 
 
 def _assemble(
@@ -632,6 +707,7 @@ def _assemble(
         ))
 
     located.sort(key=lambda pair: pair[0])
+    located = _drop_same_sentence_repeats(source, located, stats)
     return [claim for _, claim in located]
 
 

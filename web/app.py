@@ -80,38 +80,74 @@ def _pct(x: float) -> str:
 
 
 def _over_extraction() -> dict:
-    """Measure how often the extractor re-reads a number it has already claimed.
+    """Count repeats in the last scan, split by whether they are a defect or not.
 
-    Read from the last scan rather than stated as prose: the coverage sweep guarantees completeness
-    by re-reading number-bearing sentences, and the price of that guarantee is repeats. The page has
-    to name the price, not just the guarantee.
+    An earlier version of this counted every repeat of a value inside a source and called all of
+    them over-reading. That was wrong by 13x: of the 26 it found, 24 were the same number claimed
+    in DIFFERENT sentences -- "Raise it one point." and "One point a year is invisible" are two
+    real claims, and collapsing them would destroy data. Only 2 were the actual defect, the same
+    number pulled twice out of one sentence.
 
-    `reports/latest.json` is a gitignored build artifact, so it can legitimately be absent (a fresh
-    clone, or a deploy that has not scanned yet). MEASURED is built at import, so a missing report
-    must not stop the app from starting -- it degrades to `measured: False` and the copy adapts.
+    `same_sentence` is now an invariant rather than a measurement: `_drop_same_sentence_repeats`
+    enforces it at extraction. It is still counted here, because a guard nobody measures is a
+    guard nobody notices failing.
+
+    `reports/latest.json` is a gitignored build artifact and may be absent (fresh clone, or a
+    deploy that has not scanned). MEASURED is built at import, so that must not stop the app.
     """
+    blank = {"measured": False, "verdicts": 0, "same_sentence": 0, "across_sentences": 0,
+             "surfaced_duplicates": 0}
     if not REPORT_PATH.is_file():
-        return {"measured": False, "verdicts": 0, "repeats": 0, "surfaced_duplicates": 0}
+        return blank
     try:
         rep = json.loads(REPORT_PATH.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return {"measured": False, "verdicts": 0, "repeats": 0, "surfaced_duplicates": 0}
+        return blank
 
-    verdicts = repeats = surfaced_dupes = 0
+    from almanac.extract import discover_sources, sentence_index_of_quote
+
+    sources = {}
     for video in rep.get("videos", []):
-        seen: dict[tuple, int] = {}
+        sid = video.get("source_id", "")
+        if sid and sid not in sources:
+            root = Path(sid).parent.parent
+            try:
+                # Assigned key by key on purpose. tests/test_web.py bans the dotted mutate-call
+                # spelling from this entire module -- comments included -- so that no YouTube write
+                # call can hide anywhere in the web layer. The guard is crude and that is its
+                # value; the merge below is written to keep the net whole rather than to poke a
+                # hole in it for a dict.
+                for found in discover_sources(str(root)):
+                    sources[found.source_id] = found
+            except (OSError, ValueError):
+                return blank
+
+    verdicts = same = across = surfaced_dupes = 0
+    for video in rep.get("videos", []):
+        source = sources.get(video.get("source_id", ""))
+        seen: dict[tuple, list[int]] = {}
         surfaced: dict[tuple, int] = {}
         for v in video.get("verdicts", []):
             verdicts += 1
+            if source is None:
+                continue
+            idx = sentence_index_of_quote(source, v.get("quote", ""))
+            if idx is None:
+                continue
             key = (v.get("claimed_value"), v.get("claim_type"))
-            seen[key] = seen.get(key, 0) + 1
+            if key in seen:
+                if idx in seen[key]:
+                    same += 1
+                else:
+                    across += 1
+            seen.setdefault(key, []).append(idx)
             if str(v.get("status", "")).startswith("stale_"):
                 skey = (v.get("claimed_value"), v.get("entity_key"))
                 surfaced[skey] = surfaced.get(skey, 0) + 1
-        repeats += sum(n - 1 for n in seen.values() if n > 1)
         surfaced_dupes += sum(n - 1 for n in surfaced.values() if n > 1)
-    return {"measured": True, "verdicts": verdicts, "repeats": repeats,
-            "surfaced_duplicates": surfaced_dupes}
+
+    return {"measured": True, "verdicts": verdicts, "same_sentence": same,
+            "across_sentences": across, "surfaced_duplicates": surfaced_dupes}
 
 
 def _load_measured() -> dict:
@@ -145,10 +181,15 @@ def _load_measured() -> dict:
         # ran on claude-opus-5 and genuinely did vary; on the current engine six consecutive live
         # runs produced byte-identical scored output. Neither the old claim nor the new one may be
         # a literal in this file — that is the drift this page exists to catch.
+        # Deliberately NOT "identical across all N runs". The runs span two code states -- before
+        # and after the D-2 same-sentence guard -- and they are byte-identical WITHIN each state,
+        # not across them (115 verdicts became 111). Saying "all N" would be the same species of
+        # overstatement as pooling two engines' runs into one sample.
         "reproducibility": (
-            f"{rep['gate_passes']}/{rep['gate_runs']} gate PASS, and "
-            f"{'identical' if rep['identical_across_runs'] else 'differing'} scored output across "
-            f"all {rep['gate_runs']} runs"
+            f"{rep['gate_passes']}/{rep['gate_runs']} gate PASS, and byte-identical scored output "
+            f"within each measured state of the extractor ("
+            + ", ".join(f"{b['gate_runs']} runs {b['label']}" for b in rep["blocks"])
+            + ")"
         ),
         "extraction_repeats_identically": rep["identical_across_runs"],
         "reproducibility_scope": rep["scope_of_the_claim"],
@@ -158,19 +199,23 @@ def _load_measured() -> dict:
         ),
         "known_defect": (
             (
-                f"The extractor splits: {over['repeats']} of the {over['verdicts']} verdicts in the "
-                f"last scan re-read a number this pipeline had already claimed from the same "
-                f"source, so read counts run ahead of what a person would count as distinct "
-                f"claims. Every one of those repeats is discarded by the judge as skip, and "
-                f"{over['surfaced_duplicates']} duplicate corrections reached the report — but the "
-                f"coverage sweep that guarantees completeness is what causes it, and it is not "
-                f"fixed."
+                f"The extractor can pull the same number twice out of one sentence — "
+                f"\u201cSay you go sixty forty, sixty percent stocks and forty percent bonds\u201d "
+                f"once became four claims. The prompt already asked for one claim per number and "
+                f"the model did not always comply, so it is enforced in code instead: repeats "
+                f"inside a sentence are dropped, keeping the first. It is the second rule the code "
+                f"enforces rather than requests — the coverage sweep re-reads any number-bearing "
+                f"sentence the first pass returned nothing for, and this one stops that "
+                f"thoroughness turning into double-counting. In the last scan that leaves "
+                f"{over['same_sentence']} of {over['verdicts']} verdicts repeating a number within "
+                f"a sentence. The {over['across_sentences']} repeats across different sentences "
+                f"are left alone — those are second mentions, and they are real claims."
             )
             if over["measured"]
             else (
-                "The extractor splits: it can re-read a number it has already claimed from the "
-                "same sentence, so read counts run ahead of distinct claims. No scan artifact is "
-                "on disk here, so this page cannot say by how much in this deployment."
+                "The extractor can pull the same number twice out of one sentence; repeats inside "
+                "a sentence are dropped in code, keeping the first. No scan artifact is on disk in "
+                "this deployment, so the page cannot show the current count."
             )
         ),
         "figures_predate_the_sweep": False,

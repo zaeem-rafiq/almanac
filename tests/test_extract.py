@@ -335,6 +335,95 @@ def test_assemble_demotes_an_off_vocabulary_key_and_keeps_the_claim():
     assert stats.demoted_entity_key == 1
 
 
+def test_assemble_drops_the_same_number_twice_from_one_sentence():
+    """One number, one claim -- enforced in code, because the prompt asking for it is not enough.
+
+    The live extractor split "Say you go sixty forty, sixty percent stocks and forty percent bonds"
+    into four claims: sixty and forty each appeared twice, under different clause quotes. Span
+    dedup could not catch it because the spans genuinely differ. D-2's prompt already says ONE
+    CLAIM PER NUMBER; this is the code that makes it true.
+
+    The FIRST mention survives. Keeping the longest instead reads better in isolation but loses
+    data -- measured, not guessed: see the disclaimer case in the next test.
+    """
+    text = "Say you go sixty forty, sixty percent stocks and forty percent bonds. Then stop."
+    source = Source(source_id="s", text=text, locators=[])
+    stats = ExtractionStats()
+
+    claims = _assemble(
+        source,
+        [
+            _extracted(quote="Say you go sixty", value=60.0, claim_type="illustrative", entity_key=None),
+            _extracted(quote="forty", value=40.0, claim_type="illustrative", entity_key=None),
+            _extracted(quote="sixty percent stocks", value=60.0, claim_type="illustrative", entity_key=None),
+            _extracted(quote="and forty percent bonds", value=40.0, claim_type="illustrative", entity_key=None),
+        ],
+        set(load_catalog().keys()),
+        stats,
+    )
+
+    assert [c.value for c in claims] == [60.0, 40.0]
+    assert [c.quote for c in claims] == ["Say you go sixty", "forty"]
+    assert stats.dropped_same_sentence_repeat == 2
+
+
+def test_assemble_keeps_the_first_mention_when_a_disclaimer_repeats_the_number():
+    """Why the survivor is the first mention and not the longest quote.
+
+    corpus/scripts/fresh_wrong.md line 20 is one sentence carrying 10% twice -- the assumption,
+    then a disclaimer about the assumption. The labelled set records ONE row for it and anchors it
+    on the first mention. Preferring the longer quote kept the disclaimer, dropped the labelled
+    quote, and took extraction recall from 46/54 to 45/54 in a live run. This pins the rule that
+    fixed it.
+    """
+    text = (
+        "If you assume a 10% return on that, the arithmetic gets fun fast - though I want to be "
+        "clear that 10% is a number I picked to make the illustration readable, not a forecast."
+    )
+    source = Source(source_id="s", text=text, locators=[])
+    stats = ExtractionStats()
+
+    claims = _assemble(
+        source,
+        [
+            _extracted(quote="If you assume a 10% return on that", value=10.0,
+                       claim_type="illustrative", entity_key=None),
+            _extracted(quote="10% is a number I picked to make the illustration readable",
+                       value=10.0, claim_type="illustrative", entity_key=None),
+        ],
+        set(load_catalog().keys()),
+        stats,
+    )
+
+    assert [c.quote for c in claims] == ["If you assume a 10% return on that"]
+    assert stats.dropped_same_sentence_repeat == 1
+
+
+def test_assemble_keeps_the_same_number_in_a_different_sentence():
+    """The guard must not swallow a genuine second mention.
+
+    Most repeats in a real video are not splits: "Raise it one point." and "One point a year is
+    invisible" are two claims about the same number in two sentences, and both are real. A dedup
+    that dropped these would be destroying data, so this is the control on the test above.
+    """
+    text = "Raise it one point. One point a year is invisible."
+    source = Source(source_id="s", text=text, locators=[])
+    stats = ExtractionStats()
+
+    claims = _assemble(
+        source,
+        [
+            _extracted(quote="Raise it one point.", value=1.0, claim_type="other", entity_key=None),
+            _extracted(quote="One point a year is invisible.", value=1.0, claim_type="other", entity_key=None),
+        ],
+        set(load_catalog().keys()),
+        stats,
+    )
+
+    assert len(claims) == 2
+    assert stats.dropped_same_sentence_repeat == 0
+
+
 def test_assemble_deduplicates_the_same_span():
     source = read_srt(V1)
     stats = ExtractionStats()

@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-09-07T23:50:00+00:00",
+  "run_at": "2026-09-08T01:53:14+00:00",
   "gate": {
     "passed": true,
     "failures": [],
@@ -16,12 +16,12 @@
       "corpus/scripts/fresh_ok.md",
       "corpus/scripts/fresh_wrong.md"
     ],
-    "verdicts_produced": 115,
+    "verdicts_produced": 111,
     "labelled_rows": 54,
     "matched": 46,
     "unmatched_labels": 8,
     "unlocatable_labels": 0,
-    "unmatched_verdicts": 69,
+    "unmatched_verdicts": 65,
     "min_label_coverage": 0.9,
     "sensitivity": {
       "0.50": 52,
