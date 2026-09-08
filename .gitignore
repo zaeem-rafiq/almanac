@@ -26,3 +26,8 @@ renders/
 # Eval extraction cache and scratch output (A-05). `results.md` / `results.json` ARE tracked —
 # they are the table the README quotes; the cache is a build artifact.
 evals/.cache/
+
+# A-10: the dated-report re-include above is for reports a nightly run actually produced. This
+# one is a 0-video YouTube scan left over from a local run against an unauthorised channel —
+# committing it would ship the empty artifact that made 8 test_web* tests fail.
+reports/2026-09-07.md
