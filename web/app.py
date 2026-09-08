@@ -152,13 +152,25 @@ def _over_extraction() -> dict:
 
 def _load_measured() -> dict:
     """Derive the page's quotable figures from the committed eval run."""
-    raw = json.loads(EVAL_RESULTS.read_text(encoding="utf-8"))
-    rep = json.loads(REPRODUCIBILITY.read_text(encoding="utf-8"))
+    try:
+        raw = json.loads(EVAL_RESULTS.read_text(encoding="utf-8"))
+        rep = json.loads(REPRODUCIBILITY.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        # MEASURED is built at import, so an unreadable artifact here takes down every route,
+        # not just the figures. A deploy audit caught exactly that: `.vercelignore` excludes
+        # `evals/` and vercel.json's includeFiles does not list it, so the bundle reached the host
+        # without these two files and `api/index.py` raised FileNotFoundError on import -- a 500
+        # on `/`, `/api/report` and `/api/lint` alike, none of which have anything to do with the
+        # eval table. `_over_extraction` already degraded this way for a missing report; this did
+        # not. The page must be able to say "I cannot show you the figures" without dying.
+        return {"source": f"unavailable in this deployment: {exc.__class__.__name__}",
+                "figures_available": False}
     over = _over_extraction()
     by_status = {row["status"]: row for row in raw["status_scores"]}
     run, hn = raw["run"], raw["hard_negatives"]
     stale = by_status["stale_material"]
     return {
+        "figures_available": True,
         "source": (
             f"almanac eval, live run {raw['run_at'][:10]}, "
             f"{len(run['sources_read']) if isinstance(run.get('sources_read'), list) else run.get('sources_read', 7)} sources, "
