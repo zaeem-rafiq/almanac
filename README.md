@@ -3,8 +3,8 @@
 **Every gate in this gallery checks the video you're about to publish. Almanac checks the ones you already did.**
 
 Almanac reads every number in a finance creator's scripts and back catalog, checks each one
-against its own rates table (refreshed nightly from FMP, linked to the primary
-Fed / Treasury / Freddie Mac / BLS pages) and a sourced IRS facts table, and drafts the
+against its own rates table (written by `rates --refresh`, straight from Treasury, BLS,
+Freddie Mac and the New York Fed) and a sourced IRS facts table, and drafts the
 "📌 Update" note for the videos that went stale.
 
 ## The principle
@@ -17,8 +17,8 @@ a prompt is wrong.
 
 ## Status
 
-Milestone M0 — pre-flight. See `docs/plans/` for the current plan and `docs/proofs/` for
-per-issue evidence.
+Milestone M5 — submission prep. The deploy (A-09) is still open in PR #6, so there is no
+live URL yet. See `docs/plans/` for the current plan and `docs/proofs/` for per-issue evidence.
 
 ## Layout
 
