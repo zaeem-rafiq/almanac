@@ -1,0 +1,32 @@
+# Almanac runtime + tests. Versions are the ones resolved into `venv/` and recorded in
+# docs/decisions/ADR-000-stack.md; they are pinned exactly so a fresh clone runs what was measured.
+# Python 3.12.
+#
+# `anthropic` is deliberately ABSENT. The extractor moved to Vertex at 038dbe6 and no module
+# imports it: `grep -rn anthropic --include="*.py" almanac/ web/` returns nothing.
+
+# extraction + note drafting — gemini-3.8-flash on Vertex AI
+google-genai==2.22.0
+
+# YouTube Data API v3 (owner OAuth), read plus the guarded write-back
+google-api-python-client==2.200.0
+google-auth-oauthlib==1.4.1
+
+# FMP rates fetch (catalog.refresh_rates is the only caller)
+requests==2.34.2
+
+# claim/verdict schemas and the model-facing IO contract
+pydantic==2.13.5
+
+# facts/catalog.yaml
+pyyaml==6.0.3
+
+# caption parsing
+srt==3.5.3
+
+# the reviewer page
+fastapi==0.141.1
+uvicorn==0.52.4
+
+# tests
+pytest==9.1.1

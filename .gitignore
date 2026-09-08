@@ -1,4 +1,6 @@
 .env*
+# ...but the template is the README's second instruction, so it must be tracked.
+!.env.example
 token.json
 venv/
 __pycache__/
