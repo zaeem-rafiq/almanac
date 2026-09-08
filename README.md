@@ -14,7 +14,9 @@ reads. The code decides. Every verdict carries the rule that produced it.
 
 ## Try it in 60 seconds
 
-**Hosted:** _not live yet._ The deploy landed in [#6](https://github.com/zaeem-rafiq/almanac/pull/6) — `vercel.json`, `api/index.py`, a scheduled nightly scan and a keepalive are all in this tree. What has not happened is the one-time `vercel deploy --prod` and the `ALMANAC_URL` that follows it, so **there is still no URL, and this README will not invent one.** The remaining steps are `docs/A-09-zaeem-checklist.md` steps 2 and 4. Everything below runs locally, on the same engine the host will run.
+**Hosted — [almanac-gamma.vercel.app](https://almanac-gamma.vercel.app).** Open it and the last scan is already there: five videos, 83 verdicts, every one carrying the rule that produced it. Paste a script into the lint box and it reads it live. Nothing is scanned when the page loads.
+
+Everything below runs the same engine locally.
 
 ```bash
 git clone https://github.com/zaeem-rafiq/almanac.git && cd almanac

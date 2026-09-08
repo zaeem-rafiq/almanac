@@ -70,6 +70,26 @@ def check_verbatim(md: str) -> tuple[bool, str]:
     return True, f"{len(pasted.splitlines())} lines byte-identical to evals/results.md"
 
 
+def derived_from_report() -> set[float]:
+    """Totals the README may legitimately quote that appear literally in no file.
+
+    `reports/latest.json` stores per-status counts, not a total, so a claim like "83 verdicts,
+    every one carrying its rule" is true and load-bearing yet grounds against nothing. Computing
+    it here checks the claim against the report instead of exempting it — a wrong total still
+    fails, which an entry in ALLOWED_UNGROUNDED would not have caught.
+    """
+    path = ROOT / "reports" / "latest.json"
+    if not path.is_file():
+        return set()
+    report = json.loads(path.read_text(encoding="utf-8"))
+    rows = [row for video in report.get("videos", []) for row in video.get("verdicts", [])]
+    return {
+        float(len(rows)),                                              # total verdicts
+        float(sum(1 for r in rows if r.get("rule_fired"))),            # carrying a rule
+        float(len(report.get("videos", []))),                          # videos scanned
+    }
+
+
 def check_numbers(md: str) -> tuple[bool, str, list[str]]:
     """Every number OUTSIDE the verbatim block must appear in a repo artifact.
 
@@ -79,16 +99,19 @@ def check_numbers(md: str) -> tuple[bool, str, list[str]]:
     body = VERBATIM.sub(" ", md)
     prose = strip_noise(body)
 
+    sources = GROUNDING_SOURCES + ["reports/latest.json (derived)"]
     ground: dict[str, set[float]] = {}
     dates: dict[str, set[str]] = {}
     for rel in GROUNDING_SOURCES:
         raw = (ROOT / rel).read_text(encoding="utf-8")
         ground[rel] = numbers_in(raw)
         dates[rel] = set(ISO_DATE.findall(raw))
+    ground["reports/latest.json (derived)"] = derived_from_report()
+    dates["reports/latest.json (derived)"] = set()
 
     unresolved, lines = [], []
     for d in sorted(set(ISO_DATE.findall(prose))):
-        hit = [r for r in GROUNDING_SOURCES if d in dates[r]]
+        hit = [r for r in sources if d in dates[r]]
         (lines if hit else unresolved).append(f"  {d:>12}  <- {hit[0] if hit else 'NOTHING'}")
         if not hit:
             unresolved.append(d)
@@ -97,7 +120,7 @@ def check_numbers(md: str) -> tuple[bool, str, list[str]]:
         if v in ALLOWED_UNGROUNDED:
             lines.append(f"  {v:>12g}  <- ALLOWED: {ALLOWED_UNGROUNDED[v]}")
             continue
-        hit = [r for r in GROUNDING_SOURCES if v in ground[r]]
+        hit = [r for r in sources if v in ground[r]]
         lines.append(f"  {v:>12g}  <- {hit[0] if hit else 'NOTHING'}")
         if not hit:
             unresolved.append(f"{v:g}")
