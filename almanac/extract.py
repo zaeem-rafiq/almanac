@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import os
 import re
-import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,7 +34,17 @@ CHARS_PER_TOKEN = 4
 CHUNK_TOKENS = 2_000
 CHUNK_CHARS = CHUNK_TOKENS * CHARS_PER_TOKEN
 MAX_CONCURRENCY = 4
-MAX_TOKENS = 4_096
+# Must cover THINKING PLUS the answer. thinking_level=HIGH spent 3,931 tokens on one 2.9k-char
+# chunk, leaving 151 of a 4,096 budget for output — the JSON truncated mid-object and four of
+# five videos silently extracted nothing. Measured, not guessed.
+MAX_TOKENS = 24_576
+# Fixed so a re-run reproduces a run. Available on Vertex; deprecated on claude-opus-5.
+EXTRACTION_SEED = 20260908
+# thinking_level="HIGH" is UNBOUNDED in practice: it expanded to consume whatever max_output_tokens
+# allowed (3,931 of 4,096; then 23,592 of 24,576) and truncated the answer every time. An explicit
+# budget caps thinking and leaves room for output. Measured on one v1 chunk: budget=4096 ->
+# thoughts=3,980, output=1,703, finish=STOP, 20 claims in 30s.
+THINKING_BUDGET = 4_096
 
 
 class Locator(NamedTuple):
@@ -373,12 +382,19 @@ most sentences with numbers in them are not about any of these.
 - quote must be copied WORD FOR WORD from the text you are given. Do not paraphrase, do not
   tidy the grammar, do not merge two distant sentences. Keep it under 200 characters. If you
   cannot copy it exactly, do not record the claim.
+- When one sentence carries several numbers, quote the CLAUSE around the number this claim is
+  about, not the whole sentence. Still word for word, just the shorter span. Two claims from the
+  same sentence must not carry the same quote.
 - value is the number as digits. This text spells numbers out in words, so convert:
   "twenty three thousand dollars" -> 23000, "six point eight five percent" -> 6.85,
   "eight thousand five hundred fifty dollars" -> 8550.
 - unit is "usd" for dollar amounts, "pct" for percentages, null otherwise.
 - year_hint is the year the sentence itself names, and null when it names none.
-- One claim per sentence-with-a-number. Record every one you find.
+- ONE CLAIM PER NUMBER, not per sentence. A sentence holding three numbers produces three
+  claims, each with its own quote and its own value.
+  "Say you have three hundred thousand dollars left on the loan, your payment is about one
+  thousand two hundred dollars a month, and you have found an extra five hundred" is THREE
+  claims, not one. Record every number you find.
 """
 
 
@@ -411,186 +427,79 @@ def _admit_entity_key(proposed: str | None, allowed: set[str]) -> str | None:
 # ------------------------------------------------------------------------------- the model call
 
 
+# Vertex AI, not the Anthropic API. Zaeem has Google Cloud credits and the Anthropic balance is
+# exhausted. The project is passed EXPLICITLY and `gcloud config set project` is never called, so
+# this cannot reach any other project of his by accident — the isolation is structural, not careful.
+DEFAULT_PROJECT = "polygraph-hackathon"
+DEFAULT_LOCATION = "global"
+DEFAULT_MODEL = "gemini-3.8-flash"
+
+
 def _client():
-    import anthropic
+    """A Vertex AI client bound to one explicit project, plus the model id to call.
+
+    Credentials come from Application Default Credentials (`gcloud auth application-default
+    login`). No API key is read or stored for this path.
+    """
+    from google import genai
 
     from almanac.cli import load_env
 
     load_env()
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY is not set — see .env")
-    return anthropic.Anthropic(api_key=api_key), os.environ.get("LLM_MODEL", "claude-opus-5")
-
-
-# --- Cost controls -----------------------------------------------------------------------------
-#
-# Three levers, applied on Zaeem's instruction 2026-09-07 after the account ran out of credit.
-# None of them changes WHAT the model is asked. The prompt, the tool schema, the forced tool
-# choice and the parsing are byte-identical to what shipped; only the billing changes.
-#
-# 1. PROMPT CACHING. Every call re-sent the same ~1,900-token prefix at full price — the system
-#    prompt (1,358 tok) + the tool schema (538 tok) — on every call of every run ever made. The
-#    breakpoint sits at the END of `system`, so the cached prefix is tools + system (render order
-#    is tools -> system -> messages) and the per-chunk text falls after it. Opus 5's minimum
-#    cacheable prefix is 512 tokens, so this prefix qualifies.
-#
-#    NOT the top-level `cache_control` auto-breakpoint: that caches the LAST cacheable block,
-#    which here is the chunk text. Every chunk differs, so each call would write a fresh entry
-#    and none would ever read one — paying the 1.25x write premium for nothing.
-#
-# 2. EFFORT. Opus 5 runs adaptive thinking BY DEFAULT at effort `high` when `thinking` is omitted
-#    (unlike Opus 4.7/4.8), and thinking bills as OUTPUT at 5x the input rate. Extraction is a
-#    labelling task that was silently paying for deep reasoning nobody asked for.
-#
-#    Thinking is deliberately NOT disabled. On Opus 5, `thinking: {type: "disabled"}` can make the
-#    model write a tool call into visible TEXT instead of a tool_use block — the turn succeeds, the
-#    call never runs, and nothing raises. For a forced-tool-use extractor that failure is silent
-#    and total, so the cheaper-and-safe lever is low effort, not no thinking.
-#
-# 3. BATCH. Opt-in via `scan --batch`: 50% off, asynchronous. Never the default and never used by
-#    `lint` or the web endpoint, which have to answer while a human waits.
-#
-# UNVERIFIED AGAINST THE LIVE API. The credit balance is exhausted, so none of this has been
-# measured end to end — `count_tokens` is refused too. The request SHAPE is asserted offline in
-# tests/test_extract_cost.py; the savings are arithmetic, not observation. Confirm with
-# `usage.cache_read_input_tokens` on the first paid run.
-
-EXTRACT_EFFORT = "low"
-CACHE_CONTROL = {"type": "ephemeral"}   # 5-minute TTL; a read refreshes the timer for free
-BATCH_POLL_SECONDS = 5
-BATCH_TIMEOUT_SECONDS = 3_600
-
-
-def _request_params(chunk_text: str, system_prompt: str, model: str) -> dict:
-    """The exact request body, built in ONE place.
-
-    The synchronous path and the batch path both build their request here, so a batched scan
-    cannot drift from an interactive one: the two differ in transport and price, never in what
-    the model is asked.
-    """
-    return {
-        "model": model,
-        "max_tokens": MAX_TOKENS,
-        # A list of blocks, not a bare string: `cache_control` is a content-block field, and this
-        # block is the last thing in the cached prefix.
-        "system": [{
-            "type": "text",
-            "text": system_prompt,
-            "cache_control": dict(CACHE_CONTROL),
-        }],
-        "output_config": {"effort": EXTRACT_EFFORT},
-        "tools": [{
-            "name": TOOL_NAME,
-            "description": "Record every sentence that contains a number, with its label.",
-            "input_schema": Extraction.model_json_schema(),
-        }],
-        "tool_choice": {"type": "tool", "name": TOOL_NAME},
-        "messages": [{"role": "user", "content": chunk_text}],
-    }
-
-
-def _claims_from_message(message) -> list[ExtractedClaim]:
-    """Read the tool-use block. Unchanged behaviour; lifted out so the batch path shares it."""
-    blocks = [b for b in message.content if getattr(b, "type", None) == "tool_use"]
-    if not blocks:
-        return []
-    try:
-        return Extraction.model_validate(blocks[0].input).claims
-    except ValidationError:
-        return []
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT", DEFAULT_PROJECT)
+    location = os.environ.get("GOOGLE_CLOUD_LOCATION", DEFAULT_LOCATION)
+    model = os.environ.get("LLM_MODEL", DEFAULT_MODEL)
+    return genai.Client(vertexai=True, project=project, location=location), model
 
 
 def _call_model(chunk_text: str, system_prompt: str, client, model: str) -> list[ExtractedClaim]:
     """One tool-use round trip. Call shape verified in ADR-000 §4 / scripts/preflight.py."""
-    return _claims_from_message(
-        client.messages.create(**_request_params(chunk_text, system_prompt, model))
+    from google.genai import types
+
+    # `response_schema` takes the Pydantic class itself, so `Extraction` carries over from the
+    # Anthropic tool-use shape unchanged — the schema, the prompt and the claim model are the same.
+    #
+    # temperature=0.0 and a fixed seed are BOTH available here, unlike on claude-opus-5 where every
+    # sampling parameter is deprecated (ADR-000 §10). This is the determinism ADR-002 D-5 asked for
+    # and could not have. The coverage sweep below stays as a second line of defence: a pinned
+    # sample is still a sample, and the sweep checks completeness rather than trusting it.
+    response = client.models.generate_content(
+        model=model,
+        contents=chunk_text,
+        config=types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            response_mime_type="application/json",
+            response_schema=Extraction,
+            temperature=0.0,
+            seed=EXTRACTION_SEED,
+            max_output_tokens=MAX_TOKENS,
+            thinking_config=types.ThinkingConfig(thinking_budget=THINKING_BUDGET),
+        ),
     )
+    parsed = getattr(response, "parsed", None)
+    if isinstance(parsed, Extraction):
+        return parsed.claims
 
-
-def _call_model_batch(
-    chunk_texts: dict[str, str],
-    system_prompt: str,
-    client,
-    model: str,
-    poll_seconds: float = BATCH_POLL_SECONDS,
-    timeout_seconds: float = BATCH_TIMEOUT_SECONDS,
-) -> dict[str, list[ExtractedClaim]]:
-    """Run every extraction call as one Message Batch — 50% off, asynchronous.
-
-    Results come back in ANY order, so they are keyed by `custom_id` and never by position. A
-    request that errored yields no claims for its key rather than failing the whole run: the
-    coverage sweep already exists to notice sentences nothing was produced for.
-    """
-    from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
-    from anthropic.types.messages.batch_create_params import Request
-
-    if not chunk_texts:
-        return {}
-
-    # The caller's keys are internal job ids, but custom_id has to survive the round trip, so the
-    # mapping is explicit rather than assuming the keys are id-safe.
-    ids = {f"job{index}": key for index, key in enumerate(chunk_texts)}
-    batch = client.messages.batches.create(requests=[
-        Request(
-            custom_id=custom_id,
-            params=MessageCreateParamsNonStreaming(
-                **_request_params(chunk_texts[key], system_prompt, model)
-            ),
-        )
-        for custom_id, key in ids.items()
-    ])
-
-    deadline = time.monotonic() + timeout_seconds
-    while True:
-        status = client.messages.batches.retrieve(batch.id)
-        if status.processing_status == "ended":
-            break
-        if time.monotonic() > deadline:
-            raise TimeoutError(
-                f"batch {batch.id} still {status.processing_status} after {timeout_seconds}s"
-            )
-        time.sleep(poll_seconds)
-
-    out: dict[str, list[ExtractedClaim]] = {key: [] for key in chunk_texts}
-    for result in client.messages.batches.results(batch.id):
-        key = ids.get(result.custom_id)
-        if key is not None and result.result.type == "succeeded":
-            out[key] = _claims_from_message(result.result.message)
-    return out
-
-
-def _run_jobs(
-    jobs: list[tuple[str, str]], system_prompt: str, client, model: str,
-    max_workers: int, batch: bool,
-) -> dict[str, list[ExtractedClaim]]:
-    """Run `(job_key, chunk_text)` jobs and return `{job_key: claims}`.
-
-    The synchronous path warms the cache ON PURPOSE: the first call runs ALONE so it writes the
-    shared prefix, and only then do the rest fan out and read it. Firing all of them at once
-    would have every in-flight call miss simultaneously and pay the 1.25x write premium — caching
-    would then cost MORE than not caching at all. One serialized call turns N writes into
-    1 write + (N-1) reads, at the price of one call's latency.
-    """
-    if not jobs:
-        return {}
-    if batch:
-        return _call_model_batch(dict(jobs), system_prompt, client, model)
-
-    first_key, first_text = jobs[0]
-    out: dict[str, list[ExtractedClaim]] = {
-        first_key: _call_model(first_text, system_prompt, client, model)
-    }
-    rest = jobs[1:]
-    if rest:
-        with ThreadPoolExecutor(max_workers=min(max_workers, len(rest))) as pool:
-            futures = [
-                (key, pool.submit(_call_model, text, system_prompt, client, model))
-                for key, text in rest
-            ]
-            for key, future in futures:
-                out[key] = future.result()
-    return out
+    # Everything below is a FAILED chunk. Say so loudly: an empty list here is indistinguishable
+    # from "this transcript had no numbers in it", and that is exactly how a truncated response
+    # silently dropped four whole videos once.
+    candidate = (getattr(response, "candidates", None) or [None])[0]
+    reason = getattr(candidate, "finish_reason", None)
+    usage = getattr(response, "usage_metadata", None)
+    detail = f"finish_reason={reason}"
+    if usage is not None:
+        detail += (f" thoughts={getattr(usage, 'thoughts_token_count', None)}"
+                   f" candidates={usage.candidates_token_count}")
+    text = (getattr(response, "text", None) or "").strip()
+    if text:
+        try:
+            return Extraction.model_validate_json(text).claims
+        except ValidationError:
+            pass
+    raise ExtractionFailed(
+        f"the model returned no usable claims for a chunk ({detail}); "
+        f"{len(text)} chars of unparseable text"
+    )
 
 
 # --- Coverage sweep (ADR-002 D-5) ------------------------------------------------------------
@@ -663,6 +572,11 @@ def uncovered_sentences(text: str, claims: Iterable[Claim]) -> list[str]:
     return missing
 
 
+class ExtractionFailed(RuntimeError):
+    """A chunk produced nothing usable. Raised rather than returned as an empty list, because a
+    silent empty result reads as 'no numbers here' and hides a truncated or rejected response."""
+
+
 @dataclass
 class ExtractionStats:
     """What the run did, so a caller can see drops rather than infer them from a short list."""
@@ -732,7 +646,7 @@ def extract(text: str, source_id: str, locators: list) -> list[Claim]:
 
 
 def extract_sources(
-    sources: list[Source], max_workers: int = MAX_CONCURRENCY, batch: bool = False
+    sources: list[Source], max_workers: int = MAX_CONCURRENCY
 ) -> dict[str, list[Claim]]:
     """Extract from several sources at once, sharing one bounded pool.
 
@@ -746,19 +660,20 @@ def extract_sources(
     system_prompt = build_system_prompt()
     client, model = _client()
 
-    # (job_key, source_id, chunk_text). A source may hold several chunks, so each job carries its
-    # own key and the results are folded back per source — never matched by position.
-    jobs: list[tuple[str, str, str]] = []
+    jobs: list[tuple[Source, str]] = []
     for source in sources:
         for _, chunk_text in chunk(source):
-            jobs.append((f"read{len(jobs)}", source.source_id, chunk_text))
+            jobs.append((source, chunk_text))
 
     results: dict[str, list[ExtractedClaim]] = {s.source_id: [] for s in sources}
-    produced = _run_jobs(
-        [(key, text) for key, _, text in jobs], system_prompt, client, model, max_workers, batch
-    )
-    for key, source_id, _ in jobs:
-        results[source_id].extend(produced.get(key, []))
+    if jobs:
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(jobs))) as pool:
+            futures = [
+                (source, pool.submit(_call_model, chunk_text, system_prompt, client, model))
+                for source, chunk_text in jobs
+            ]
+            for source, future in futures:
+                results[source.source_id].extend(future.result())
 
     stats = ExtractionStats()
     by_source = {s.source_id: s for s in sources}
@@ -777,18 +692,15 @@ def extract_sources(
         retry = {sid: miss for sid, miss in retry.items() if miss}
         if not retry:
             break
-        sweep_jobs = [
-            (f"sweep{index}", source_id, "\n".join(miss))
-            for index, (source_id, miss) in enumerate(retry.items())
-        ]
-        produced = _run_jobs(
-            [(key, text) for key, _, text in sweep_jobs],
-            system_prompt, client, model, max_workers, batch,
-        )
-        for key, source_id, _ in sweep_jobs:
-            recovered = produced.get(key, [])
-            stats.recovered_by_sweep += len(recovered)
-            results[source_id].extend(recovered)
+        with ThreadPoolExecutor(max_workers=min(max_workers, len(retry))) as pool:
+            futures = {
+                sid: pool.submit(_call_model, "\n".join(miss), system_prompt, client, model)
+                for sid, miss in retry.items()
+            }
+            for sid, future in futures.items():
+                recovered = future.result()
+                stats.recovered_by_sweep += len(recovered)
+                results[sid].extend(recovered)
         assembled = {
             source_id: _assemble(by_source[source_id], raw, allowed, stats)
             for source_id, raw in results.items()

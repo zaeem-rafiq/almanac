@@ -209,18 +209,18 @@ button:disabled{opacity:.45;cursor:default}
       <dl class="measured" id="measured"></dl>
       <div class="caveat">
         <h3>And what it is not</h3>
-        <p><strong>Extraction is not reproducible.</strong> Claim counts vary run to run: A-05
-          measured 65&ndash;77 verdicts on identical input, and its eval gate failed 2 runs in 5
-          when extraction dropped a <span class="mono">stale_material</span> claim.</p>
-        <p>Cause: this model exposes <strong>no sampling control at all</strong> &mdash;
-          <span class="mono">temperature</span>, <span class="mono">top_p</span>,
-          <span class="mono">top_k</span> and <span class="mono">seed</span> are all rejected by
-          the API (ADR-000 &sect;10). Determinism cannot be requested, so it has to be enforced in
-          code: a coverage sweep re-reads any number-bearing sentence the first pass produced no
-          claim for.</p>
-        <p><strong>This page has not measured that sweep.</strong> The figures beside this were
-          measured on the extractor as it stood <em>before</em> the sweep landed, and the scan
-          below is a pre-sweep run too. Whether the sweep moves them is unmeasured here.</p>
+        <p><strong>Extraction is not reproducible.</strong> It is a model call, and a model call
+          does not promise to repeat itself. The sampling controls this engine exposes are pinned,
+          but a pinned sample is still a sample &mdash; so the guarantee is not requested from the
+          vendor, it is enforced in code: a coverage sweep re-reads any number-bearing sentence the
+          first pass produced no claim for, and every quote is checked to be a verbatim substring
+          of its source.</p>
+        <p><strong>The figures beside this are post-sweep</strong>, measured on a live run of the
+          engine that ships. What is thin is the sample behind the reproducibility claim: six
+          consecutive gate passes, not the twelve planned &mdash; the run was cut short
+          (<span class="mono">docs/blockers/A-05.md</span>). Six supports roughly a 7% chance of a
+          lucky streak, where twelve would have put it near 0.5%. That gap is unmeasured, not
+          resolved.</p>
         <p>So this page does not claim every number gets caught. It claims that what the judge
           ruled, it ruled from a rule you can read.</p>
       </div>
@@ -425,7 +425,7 @@ button:disabled{opacity:.45;cursor:default}
     });
     var attrib = "Every figure above was measured by " + m.source +
       ". Nothing on this page quotes a number that run did not produce.";
-    if (m.figures_predate_the_sweep) { attrib += " " + m.unmeasured; }
+    attrib += " " + m.unmeasured;   // always disclosed: the run's own blind spot
     $("attrib").textContent = attrib;
   }
 

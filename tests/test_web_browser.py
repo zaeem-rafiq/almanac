@@ -125,11 +125,18 @@ def test_page_renders_with_zero_console_errors(browser, base_url: str, label: st
     for video_id in ("9A126b64qug", "Bzewy8DWGlo", "di6RXMzVjQQ", "6o6TiXPHlu0", "3dil-DquuG0"):
         assert video_id in body, f"{label}: {video_id} not linked on the page"
 
-    # The honesty copy must survive any redesign.
+    # The honesty copy must survive any redesign. Two of these assertions used to pin the copy
+    # to "no sampling control" and "has not measured that sweep". Both statements were true of the
+    # Anthropic engine and are false of the Gemini one that ships: the sampling controls exist and
+    # are pinned, and evals/results.json is a post-sweep run. A test may not require the page to
+    # keep saying something untrue, so they are replaced by what the page must now stand behind --
+    # the guarantee actually enforced in code, and the thinness of the sample behind it.
     assert "not reproducible" in body
-    assert "no sampling control" in body
-    assert "has not measured that sweep" in body
-    assert "has not been applied" not in body  # the retracted temperature claim
+    assert "coverage sweep" in body
+    assert "consecutive gate passes" in body
+    assert "has not been applied" not in body  # the retracted sampling-parameter claim
+    assert "no sampling control" not in body
+    assert "temperature" not in body.lower()
 
     # No horizontal overflow at either width — "mobile-readable at 390px" is a measurement.
     overflow = page.evaluate(

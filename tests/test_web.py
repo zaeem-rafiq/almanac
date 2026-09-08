@@ -136,32 +136,49 @@ def test_v4_count_line_is_read_from_the_run_not_hardcoded(client: TestClient) ->
 
 
 def test_page_quotes_only_measured_figures(client: TestClient) -> None:
-    """Nothing on this page may claim more than the eval table supports."""
+    """Nothing on this page may claim more than the eval table supports.
+
+    This test used to hard-code "89% (48/54)" — a figure measured on a model the project no longer
+    runs. A literal here re-creates exactly the drift the page promises not to have: the number
+    stays put while the run moves. It now compares the page against evals/results.json, so the
+    assertion cannot outlive the measurement.
+    """
+    import json
+    from pathlib import Path as _P
+
+    raw = json.loads((_P(__file__).resolve().parents[1] / "evals" / "results.json").read_text())
+    by_status = {row["status"]: row for row in raw["status_scores"]}
+
     measured = client.get("/api/report").json()["measured"]
+
+    expected_recall = f"{round(raw['extraction_recall'] * 100)}% ({raw['run']['matched']}/{raw['run']['labelled_rows']})"
+    assert measured["extraction_recall"] == expected_recall
+    assert measured["claim_type_accuracy"] == f"{round(raw['claim_type']['accuracy'] * 100)}%"
+    assert measured["stale_material_recall"] == f"{by_status['stale_material']['recall']:.2f}"
+    assert measured["skip_recall"] == f"{by_status['skip']['recall']:.2f}"
+
+    # Extraction is a model call; the page must not imply it repeats itself.
     assert measured["extraction_reproducible"] is False
-    assert measured["extraction_recall"] == "89% (48/54)"
-    assert measured["stale_material_recall"] == "1.00"
 
-    # ADR-000 §10: this model accepts no sampling control, so `temperature` is not the cause and
-    # never could have been the fix. The page must name the real constraint.
-    assert "no sampling control" in measured["known_defect"]
-    assert "ADR-000" in measured["known_defect"]
+    # The defect statement must name what is actually enforced, not a sampling knob. ADR-000 §10:
+    # claude-opus-5 accepted no sampling control at all, and the engine has since moved to Gemini
+    # on Vertex — so `temperature` was never the cause on either engine.
+    assert "coverage sweep" in measured["known_defect"]
 
-    # The figures predate the d314e9a coverage sweep and this session could not re-measure
-    # (the API credit balance is exhausted). The page must carry that limit, not hide it.
-    assert measured["figures_predate_the_sweep"] is True
-    assert measured["sweep_measured_here"] is False
+    # The figures now come from a post-sweep run on the shipping engine, so the page no longer
+    # carries the "measured before the sweep" caveat.
+    assert measured["figures_predate_the_sweep"] is False
+    assert measured["sweep_measured_here"] is True
 
     page = client.get("/").text
     assert "not reproducible" in page
-    assert "no sampling control" in page
-    assert "has not measured that sweep" in page
 
-    # Regression guard on the retracted claim. It was false twice over — the fix cannot be
-    # applied, and a different one already landed — and it sat in the panel the page's
-    # credibility rests on, so it must not come back.
+    # Regression guard on the retracted claim. It was false twice over — the parameter does not
+    # exist on the model it named, and a different fix already landed — and it sat in the panel the
+    # page's credibility rests on, so it must not come back.
     assert "has not been applied" not in page
     assert "API default of 1.0" not in page
+    assert "temperature" not in page.lower()
 
 
 # ---------------------------------------------------------------------------------- /api/lint

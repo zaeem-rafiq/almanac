@@ -223,7 +223,7 @@ def _shown(path):
         return Path(path).resolve()
 
 
-def _judged(sources, draft_notes: bool, batch: bool = False):
+def _judged(sources, draft_notes: bool):
     """extract -> judge -> (optionally) notes. The only order this pipeline may run in.
 
     The model labels (extract), then the code decides (judge), then the model phrases what the code
@@ -234,7 +234,7 @@ def _judged(sources, draft_notes: bool, batch: bool = False):
     from almanac.judge import judge_all
     from almanac.notes import annotate
 
-    by_source = extract_sources(sources, batch=batch)
+    by_source = extract_sources(sources)
     judged = {sid: judge_all(claims) for sid, claims in by_source.items()}
     notes = {}
     if draft_notes:
@@ -303,7 +303,7 @@ def _cmd_scan(args) -> int:
             )
             return 2
 
-    judged, notes = _judged(sources, draft_notes=not args.no_notes, batch=args.batch)
+    judged, notes = _judged(sources, draft_notes=not args.no_notes)
     report = build_report(args.source, judged, notes)
     json_path, md_path = write_report(report, args.out)
 
@@ -327,6 +327,34 @@ def _cmd_lint(args) -> int:
     print("-" * 130)
     print(_summary(counts_by_status(rows)))
     return 0
+
+
+def _cmd_eval(args) -> int:
+    """`eval` — score extract + judge against the human labels in evals/claims.jsonl.
+
+    This command READS the labelled set and never writes it. A miss is printed for Zaeem to rule
+    on; an agent that edits a label to move a number is falsifying the evidence the demo rests on.
+
+    Exits non-zero when the binary gate fails: any hard-negative false positive, or
+    `stale_material` recall under the floor. Liveness is checked first, so a run that produced
+    nothing fails loudly instead of passing every negative vacuously.
+    """
+    from almanac.evaluate import gate_failures, render_markdown, run, write_results
+
+    from almanac.evaluate import MIN_LABEL_COVERAGE
+
+    floor = MIN_LABEL_COVERAGE if args.min_coverage is None else args.min_coverage
+    result = run(min_coverage=floor, cache_path=args.cache)
+    md_path, json_path = write_results(result, args.out)
+
+    print(render_markdown(result))
+    print(f"wrote {_shown(md_path)} and {_shown(json_path)}")
+
+    failures = gate_failures(result)
+    for failure in failures:
+        print(f"GATE FAIL: {failure}")
+    print("GATE PASS" if not failures else f"GATE FAIL ({len(failures)} reason(s))")
+    return 1 if failures else 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -365,17 +393,24 @@ def main(argv: list[str] | None = None) -> int:
     scan.add_argument("--out", default=None, help="output directory (default: reports/)")
     scan.add_argument("--target", default=None, help="override the corpus directory to scan")
     scan.add_argument("--no-notes", action="store_true", help="skip drafting update notes")
-    scan.add_argument(
-        "--batch", action="store_true",
-        help="extract via the Message Batches API: 50%% cheaper, asynchronous (minutes, not "
-             "seconds). A back catalogue is not latency-sensitive; `lint` never uses this.",
-    )
     scan.set_defaults(func=_cmd_scan)
 
     lint = sub.add_parser("lint", help="judge one script or caption file")
     lint.add_argument("target", help="a .srt/.md file")
     lint.add_argument("--notes", action="store_true", help="also draft the update notes")
     lint.set_defaults(func=_cmd_lint)
+
+    evaluate = sub.add_parser("eval", help="score extract + judge against evals/claims.jsonl")
+    evaluate.add_argument("--out", default=None, help="output directory (default: evals/)")
+    evaluate.add_argument(
+        "--cache", default=None, metavar="PATH",
+        help="reuse (or create) a saved extraction, so a re-run scores the same claims",
+    )
+    evaluate.add_argument(
+        "--min-coverage", type=float, default=None,
+        help="how much of a labelled quote a verdict must cover to be matched to it",
+    )
+    evaluate.set_defaults(func=_cmd_eval)
 
     args = parser.parse_args(argv)
     return args.func(args)

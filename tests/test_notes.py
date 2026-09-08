@@ -56,28 +56,40 @@ def stale_pct_verdict() -> Verdict:
 # ---------------------------------------------------------------------------- a scripted model
 
 @dataclass
-class FakeMessage:
-    text: str
+class FakeResponse:
+    """What `client.models.generate_content` returns: the reply text on `.text`."""
 
-    @property
-    def content(self):
-        block = type("Block", (), {"type": "text", "text": self.text})
-        return [block()]
+    text: str
 
 
 @dataclass
 class FakeClient:
-    """Replies in order. Records every call so a retry can be proven to have happened."""
+    """Replies in order. Records every call so a retry can be proven to have happened.
+
+    Stands in for `google.genai.Client`, whose call is
+    `client.models.generate_content(model=, contents=, config=)`. Each call is recorded in a
+    NORMALISED shape — `{"model", "system", "messages"}` — so the assertions below read the same
+    whichever client the code calls. Only the double moved; nothing it asserts did.
+    """
 
     replies: list
     calls: list = field(default_factory=list)
 
     def __post_init__(self):
-        self.messages = self
+        self.models = self
 
-    def create(self, **kwargs):
-        self.calls.append(kwargs)
-        return FakeMessage(self.replies[min(len(self.calls) - 1, len(self.replies) - 1)])
+    def generate_content(self, *, model=None, contents=None, config=None):
+        messages = [
+            {"role": turn["role"], "content": turn["parts"][0]["text"]}
+            for turn in (contents or [])
+        ]
+        self.calls.append({
+            "model": model,
+            "system": getattr(config, "system_instruction", None),
+            "messages": messages,
+            "config": config,
+        })
+        return FakeResponse(self.replies[min(len(self.calls) - 1, len(self.replies) - 1)])
 
 
 # ------------------------------------------------------------------------------- format_value

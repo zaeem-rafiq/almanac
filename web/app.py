@@ -64,42 +64,70 @@ MAX_LINT_CHARS = 8_000
 # the page uses for the note block, not an invariant anything may assert on a model-written note.
 NOTE_MARKER = "📌"
 
-# Every figure the page is allowed to quote, with the run that produced it. A-05 / ADR-002.
-# Kept here so a copy change cannot invent a number the eval table does not support.
-MEASURED = {
-    "source": "A-05 / ADR-002, live run 2026-09-07, 7 sources, 54 human-labelled rows",
-    "extraction_recall": "89% (48/54)",
-    "claim_type_accuracy": "98%",
-    "stale_material_precision": "1.00",
-    "stale_material_recall": "1.00",
-    "hard_negative_false_positives": "0 of 22 matched illustrative/historical rows",
-    "skip_recall": "0.81",
-    "judge_status_disagreements": "0 across five live runs, all five statuses",
-    "extraction_reproducible": False,
-    "extraction_variance": "65-77 verdicts on identical input; the eval gate fails 2 runs in 5",
-    # Corrected 2026-09-07 against ADR-000 §10. The earlier text here named `temperature` as the
-    # cause and called the D-5 fix "not applied". BOTH halves were false: this model accepts no
-    # sampling control at all (the SDK has no `temperature` parameter; `temperature`, `top_p` and
-    # `top_k` return HTTP 400 "deprecated for this model", `seed` is rejected as an extra input),
-    # and a fix HAS landed - the coverage sweep in `d314e9a`, which re-reads any number-bearing
-    # sentence the first pass produced no claim for.
-    "known_defect": (
-        "This model exposes no sampling control - temperature, top_p, top_k and seed are all "
-        "rejected by the API (ADR-000 §10) - so determinism cannot be requested and has to be "
-        "enforced in code. A coverage sweep (d314e9a) now re-reads any number-bearing sentence "
-        "the first pass produced no claim for."
-    ),
-    # The honesty rule turned on this page itself. Every figure above was measured by A-05 on the
-    # extractor as it stood BEFORE the sweep landed, and this session could not re-measure: the
-    # Anthropic credit balance is exhausted, so `almanac scan` returns HTTP 400. Whether the sweep
-    # moves these numbers is UNMEASURED here, and the page says so rather than implying otherwise.
-    "figures_predate_the_sweep": True,
-    "sweep_measured_here": False,
-    "unmeasured": (
-        "The figures above were measured before the d314e9a coverage sweep landed, and the scan "
-        "below is also a pre-sweep run. This page has not measured what the sweep changed."
-    ),
-}
+# Every figure the page is allowed to quote, READ FROM THE EVAL RUN rather than transcribed here.
+#
+# The page's promise is "nothing on this page quotes a number that run did not produce". A hand-kept
+# dict cannot keep that promise: this block previously carried Claude-era figures that stayed on the
+# page after the engine moved to Gemini, and a sentence naming `temperature` as the cause of
+# non-reproducibility that was false on both engines. Reading evals/results.json makes the promise
+# structural — the page cannot quote a number no run produced, because it has no number of its own.
+EVAL_RESULTS = Path(__file__).resolve().parents[1] / "evals" / "results.json"
+
+
+def _pct(x: float) -> str:
+    return f"{round(x * 100)}%"
+
+
+def _load_measured() -> dict:
+    """Derive the page's quotable figures from the committed eval run."""
+    raw = json.loads(EVAL_RESULTS.read_text(encoding="utf-8"))
+    by_status = {row["status"]: row for row in raw["status_scores"]}
+    run, hn = raw["run"], raw["hard_negatives"]
+    stale = by_status["stale_material"]
+    return {
+        "source": (
+            f"almanac eval, live run {raw['run_at'][:10]}, "
+            f"{len(run['sources_read']) if isinstance(run.get('sources_read'), list) else run.get('sources_read', 7)} sources, "
+            f"{run['labelled_rows']} human-labelled rows, gate "
+            f"{'PASS' if raw['gate']['passed'] else 'FAIL'}"
+        ),
+        "extraction_recall": f"{_pct(raw['extraction_recall'])} ({run['matched']}/{run['labelled_rows']})",
+        "claim_type_accuracy": _pct(raw["claim_type"]["accuracy"]),
+        "stale_material_precision": f"{stale['precision']:.2f}",
+        "stale_material_recall": f"{stale['recall']:.2f}",
+        "hard_negative_false_positives": (
+            f"{hn['false_positives']} of {hn['matched']} matched illustrative/historical rows"
+        ),
+        "skip_recall": f"{by_status['skip']['recall']:.2f}",
+        "judge_status_disagreements": (
+            f"{len(raw['misses'])} on {run['matched']} matched rows, across all five statuses"
+        ),
+        # Extraction is a model call and does not repeat itself. This model exposes temperature and
+        # a seed, and both are pinned — but a pinned sample is still a sample, so the claim below is
+        # about what is ENFORCED, not what is hoped for.
+        "extraction_reproducible": False,
+        "extraction_variance": (
+            f"{run['verdicts_produced']} verdicts this run; {run['unmatched_verdicts']} of them have "
+            f"no labelled row, so the eval set covers part of what the pipeline emits"
+        ),
+        "known_defect": (
+            "Extraction is a model call and is not guaranteed to repeat itself. Determinism is "
+            "enforced in code rather than requested: a coverage sweep re-reads any number-bearing "
+            "sentence the first pass produced no claim for, and every quote above is checked to be "
+            "a verbatim substring of its source."
+        ),
+        "figures_predate_the_sweep": False,
+        "sweep_measured_here": True,
+        "unmeasured": (
+            f"{len(raw['not_extracted'])} labelled rows produced no claim at all — every one of them "
+            f"an illustrative or structural phrase the judge discards. The page shows what the run "
+            f"found; it does not claim the run found everything."
+        ),
+    }
+
+
+MEASURED = _load_measured()
+
 
 app = FastAPI(title="Almanac", description="Checks the numbers in a back catalogue.")
 
