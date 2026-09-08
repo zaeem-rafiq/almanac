@@ -68,7 +68,12 @@ def _cmd_facts(_args) -> int:
     """Print every key with its current value, as-of/effective date, and source.
 
     Reads facts/catalog.yaml and facts/rates.json only. Makes no network call, and needs no
-    FMP_API_KEY — that is the runtime contract A-01 establishes.
+    API key — that is the runtime contract A-01 establishes.
+
+    This once named FMP_API_KEY specifically. That is no longer the interesting claim: the four
+    rate feeds moved to the NY Fed, Freddie Mac, Treasury and BLS (ADR-000 §9), every one of them
+    keyless, and `catalog.py` now reads no environment variable at all. So `rates --refresh`
+    needs no key either — the no-key property is not special to this command any more.
     """
     from almanac.catalog import freshness_report
 
