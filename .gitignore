@@ -24,3 +24,4 @@ renders/
 # Eval extraction cache and scratch output (A-05). `results.md` / `results.json` ARE tracked —
 # they are the table the README quotes; the cache is a build artifact.
 evals/.cache/
+.vercel
