@@ -3,8 +3,10 @@
 **Status: PREPARED, NOT SUBMITTED.** Every field below is ready to paste. Zaeem submits.
 Claude does not create the Devpost account, accept its terms, or press Submit.
 
-Prepared 2026-09-07. Every figure here was re-derived from the repo at `8e0cb2d`; the
-provenance for each one is in [`docs/proofs/A-12.md`](../proofs/A-12.md).
+Prepared 2026-09-07, re-verified against `main` @ `89085f7` after the A-09 deploy landed.
+Every figure here was re-derived from the repo, and every live-URL figure was re-run against the
+deployed host in this session. Provenance for each one is in
+[`docs/proofs/A-12.md`](../proofs/A-12.md).
 
 > **Two tags in the Linear issue (HAC-48) are factually wrong and are NOT used below.**
 > The issue was written before the engine migration.
@@ -41,6 +43,7 @@ vertex-ai
 gemini
 youtube-api
 github-actions
+vercel
 pydantic
 pytest
 playwright
@@ -53,12 +56,12 @@ Do **not** enter `anthropic` or `fred`. Neither is in the codebase.
 | Field | Value |
 |---|---|
 | **Repository** | `https://github.com/zaeem-rafiq/almanac` — verified PUBLIC |
-| **Try it out / live URL** | **NONE YET.** See "Before you submit" below. |
+| **Try it out / live URL** | `https://almanac-gamma.vercel.app` — verified 200 this session. Use this stable alias, **not** the per-deploy `almanac-<hash>-zk-hackathon.vercel.app`, which changes on every deploy. |
 | **Video demo** | **NONE YET.** Optional per the brief. Leave blank rather than linking a placeholder. |
 
 ### 5. Gallery images
-Four real screenshots of the running app, in `docs/submission/`. Upload in this order — the
-first becomes the project thumbnail.
+Five real screenshots in `docs/submission/` — four of the app running locally, one of the
+deployed host. Upload in this order; the first becomes the project thumbnail.
 
 | # | File | What it shows |
 |---|---|---|
@@ -66,11 +69,13 @@ first becomes the project thumbnail.
 | 2 | `02-eval-scorecard.png` | "What this page is allowed to claim" — the eval numbers, next to the caveats pane that says what they do not prove |
 | 3 | `03-catalog-watch.png` | The whole back-catalogue scan: 5 videos, 6 stale_material / 1 stale_immaterial / 1 correct / 3 unresolved / 72 skip |
 | 4 | `04-live-lint.png` | A live end-to-end run in the browser: 12 numbers read in 44.4s, one stale_material, one stale_immaterial |
+| 5 | `05-live-site.png` | The same surface on the **deployed** host, captured from `https://almanac-gamma.vercel.app` — 11 verdict rows, 0 console errors |
 
-**The "Actions run log" image the issue asks for does not exist and was not faked.**
-`gh run list` returns zero rows — this repo has never run a workflow. `keepalive.yml` and
-`nightly.yml` on `main` are both stubs (`echo "A-1x fills this in."`); the working versions are
-in the unmerged PR #6. Image 4 is the substitute: it is the same pipeline, running live.
+**The "Actions run log" image the issue asks for still does not exist and was not faked.**
+`gh run list` returns zero rows — no workflow has ever executed. This is no longer because the
+workflows are stubs: A-09 merged, `keepalive.yml` now carries a real `cron: "*/10 12-22 8 9 *"`
+and the repo variable `ALMANAC_URL` is set. Nothing has simply fired yet. Images 4 and 5 are the
+substitutes, and image 5 is the stronger one: it is the deployed host, not a local server.
 
 ---
 
@@ -152,7 +157,7 @@ Artifact: `evals/results.json`. Gate: **PASS**.
 | `claim_type` accuracy | **98%** (45 of 46) |
 | `skip` recall | 0.75 (24 of 32) — the 8 misses are all rows extraction never produced a claim for |
 | Verdicts produced | 111 |
-| Test suite | **278 passing** |
+| Test suite | **290 passing** |
 
 **Reproducibility, measured rather than promised.** 9 `almanac eval` runs, live extraction, each
 to its own output directory: **9/9 gate PASS**. `temperature=0.0` and a pinned `seed`, both
@@ -214,30 +219,36 @@ Playwright.
 
 ---
 
-## Before you submit — four things only Zaeem can do
+## Before you submit — what changed, and what is left
 
-**1. The live URL does not exist.** Verified: PR #6 is open and unmerged, `vercel` is not logged
-in, `gh secret list` and `gh variable list` are both empty, and `gh run list` returns zero rows.
-If you cannot land the deploy before 03:30 CT, **submit with the repo link and no live URL** —
-a submitted partial beats an unsubmitted whole. Do not paste a URL that has not returned 200.
+**Re-verified this session against `main` @ `89085f7`, merged into this branch.** Three of the
+four blockers recorded earlier are resolved. None of it was taken on report — every line below
+was re-run here.
 
-**2. `reports/latest.json` must exist wherever the app runs.** It is a gitignored build artifact.
-Without it `GET /api/report` returns **503** and the page is empty — 17 of 278 tests fail on a
-fresh clone for exactly this reason, and they pass the moment the file is generated. Whatever
-host you deploy to must run:
-```bash
-python -m almanac scan --source corpus --out reports/
+**1. The live URL exists.** Checked directly:
 ```
+GET  https://almanac-gamma.vercel.app/            -> HTTP 200 · 26,600 bytes · 0.18s
+GET  https://almanac-gamma.vercel.app/api/report  -> HTTP 200 · 5 videos · 83 verdicts
+                                                     83/83 carry rule_fired
+POST https://almanac-gamma.vercel.app/api/lint    -> HTTP 200 · 34.6s · 12 verdicts
+                                                     12/12 carry rule_fired
+                                                     stale_material   7000 -> 7500 (R5.stale_material)
+                                                     stale_immaterial 6.85 -> 6.71
+```
+Paste the **alias**, not the per-deploy hostname.
 
-**3. `keepalive.yml` on `main` is a stub.** It is `workflow_dispatch`-only and echoes
-`"A-11 fills this in."` The working version — every 10 minutes, 12:00–22:00 UTC on 8 September,
-curling `/api/report` and failing on a 200 with an empty body — is in PR #6 and needs the repo
-variable `ALMANAC_URL`. The end-state's "keepalive enabled" is **not** met by `main` today.
+**2. `reports/latest.json` is now committed** (`ff0e4ff`), so the 503-on-a-fresh-host problem is
+gone. The suite is **290 passed** on the merged tree, with no artifact step needed first.
 
-**4. Devpost's students-only rule.** Confirm the profile shows `rk3469@columbia.edu` before
-submitting.
+**3. `keepalive.yml` is real and `ALMANAC_URL` is set** — but **no run has ever fired**
+(`gh run list` is empty). The cron is `*/10 12-22 8 9 *`, so it should begin at 12:00 UTC on
+8 September. Nothing has proven it works end to end. Trigger it once by hand
+(`gh workflow run keepalive`) rather than trusting it for the judging window untested.
 
----
+**4. Devpost's students-only rule.** Confirm the profile shows `rk3469@columbia.edu`.
+
+**Unchanged:** there is still no demo video. Leave the field blank rather than linking a
+placeholder.
 
 ## The code-freeze tag
 

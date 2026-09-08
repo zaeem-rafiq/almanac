@@ -17,8 +17,8 @@ a prompt is wrong.
 
 ## Status
 
-Milestone M5 — submission prep. The deploy (A-09) is still open in PR #6, so there is no
-live URL yet. See `docs/plans/` for the current plan and `docs/proofs/` for per-issue evidence.
+Milestone M5 — submission prep. Live at <https://almanac-gamma.vercel.app>. See `docs/plans/`
+for the current plan and `docs/proofs/` for per-issue evidence.
 
 ## Layout
 
