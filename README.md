@@ -232,10 +232,16 @@ The middle and bottom rows are the product. Anything can find a stale number; no
   entry in `facts/catalog.yaml` is human-supplied with an IRS/SSA/TreasuryDirect URL — the agent
   may scaffold a row, it may not fill a value. `catalog.py` carries `MANUAL_MAX_AGE_DAYS = 395`,
   and an entry past it is reported stale rather than quietly served.
-* **The market rates are fetched via FMP, and every row links its primary source.**
-  `catalog.refresh_rates()` is the only FMP caller in the repo; everything else reads
-  `facts/rates.json`, whose rows point at treasury.gov, bls.gov, freddiemac.com and
-  newyorkfed.org. There is no FRED call in this codebase.
+* **The market rates are read from the primary feeds directly, and no key is needed for them.**
+  Each of the four has its own fetcher in `catalog.FETCHERS` — NY Fed for the effective fed funds
+  rate, Freddie Mac's PMMS history for the 30-year fixed, Treasury's daily par yield for the
+  10-year, BLS for CPI — and every row in `facts/rates.json` records which fetcher produced it
+  alongside the primary-source URL it mirrors. `catalog.refresh_rates()` is the only function in
+  the repo that reaches the network for a rate; everything else reads the written table. A fetcher
+  that fails leaves the previous value intact and is reported, so a network blip cannot blank a
+  good number. There is no FRED call here, and **no FMP call either** — FMP's `economic-indicators`
+  returns a ~9-month-old window and cannot produce `cpi_yoy` at all, so ADR-000 §9 replaced it with
+  these four.
 * **Extraction repeats, measured rather than promised.** 9 gate runs across two measured states of
   `extract.py`, byte-identical **within each state** — 6 before the D-2 same-sentence guard and 3
   with it. The two blocks are deliberately not pooled: the guard changed what counts as a claim
@@ -258,7 +264,7 @@ The middle and bottom rows are the product. Anything can find a stale number; no
 | language | Python 3.12 |
 | extraction + note drafting | **`gemini-3.8-flash` on Google Vertex AI** (`google-genai`), `temperature=0.0` and a pinned seed. **Not Anthropic** — that path was retired at `038dbe6` and no module imports it |
 | video I/O | YouTube Data API v3, owner OAuth (`google-api-python-client`). Never `yt-dlp`, never HTML scraping |
-| market rates | FMP → `facts/rates.json`, each row linked to its primary source |
+| market rates | four keyless primary feeds — NY Fed · Freddie Mac · Treasury · BLS — → `facts/rates.json`, each row recording its fetcher and source URL |
 | decisions | plain Python in `almanac/judge.py`. No model, no framework |
 | reviewer page | FastAPI + `uvicorn`, one static page, read-only |
 | tests | `pytest` — `pytest tests/ -q` |

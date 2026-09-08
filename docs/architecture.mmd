@@ -20,7 +20,7 @@ flowchart TB
   report["<b>report.py</b><br/>reports/latest.json"]:::code
 
   manual["<b>facts/catalog.yaml</b><br/>IRS · SSA · TreasuryDirect<br/><i>human-supplied, source_url required</i>"]:::data
-  rates["<b>facts/rates.json</b><br/>fetched via FMP by <b>rates --refresh</b><br/><i>each row links its primary source:</i><br/>Treasury · BLS · Freddie Mac · NY Fed"]:::data
+  rates["<b>facts/rates.json</b><br/>written by <b>rates --refresh</b><br/><i>read straight from four keyless feeds:</i><br/>NY Fed · Freddie Mac · Treasury · BLS"]:::data
 
   web["<b>reviewer page</b><br/>web/app.py<br/><i>read-only — approves nothing</i>"]:::code
   writeback["<b>youtube.py</b> — write-back<br/>GUARD: ALMANAC_WRITE=true<br/>AND channel = ALMANAC_TEST_CHANNEL_ID<br/>AND --apply<br/><i>anything else is a dry run</i>"]:::guard
