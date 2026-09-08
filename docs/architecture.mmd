@@ -1,0 +1,35 @@
+%% Almanac — how a number in a published video becomes a verdict.
+%% Render:  mmdc -i docs/architecture.mmd -o docs/architecture.svg -b transparent
+%% Every bare *.py label below is a real module in almanac/, and web/app.py is real at that path.
+%% Proof A-10 #2 asserts exactly that, so a renamed module breaks the proof, not just the picture.
+flowchart TB
+
+  classDef llm   fill:#fdf6e3,stroke:#b58900,stroke-width:1.6px,color:#4a3b00;
+  classDef code  fill:#eef4fb,stroke:#31577f,stroke-width:1.6px,color:#16324f;
+  classDef data  fill:#f3f3f0,stroke:#8a8a80,stroke-width:1.3px,color:#3a3a34;
+  classDef guard fill:#fbeeee,stroke:#8c2f2f,stroke-width:1.6px,color:#5c1a1a;
+
+  nightly["<b>nightly GitHub Action</b><br/>0 7 * * * - refresh rates, scan,<br/>commit the report"]:::code
+  cliRun["<b>cli.py</b><br/>scan · lint · eval"]:::code
+
+  src["<b>captions / script</b><br/>corpus/ · YouTube Data API v3"]:::data
+  extract["<b>extract.py</b> — LLM<br/>gemini-3.8-flash on Vertex AI<br/><i>labels what a sentence is</i>"]:::llm
+  catalog["<b>catalog.py</b><br/><i>resolves the number to a fact</i>"]:::code
+  judge["<b>judge.py</b> — no model call<br/>rules R1 → R5, first match wins<br/><i>every verdict carries rule_fired</i>"]:::code
+  notes["<b>notes.py</b> — LLM<br/><i>drafts the update note;</i><br/>check_note() is code and can refuse it"]:::llm
+  report["<b>report.py</b><br/>reports/latest.json"]:::code
+
+  manual["<b>facts/catalog.yaml</b><br/>IRS · SSA · TreasuryDirect<br/><i>human-supplied, source_url required</i>"]:::data
+  rates["<b>facts/rates.json</b><br/>fetched via FMP by <b>rates --refresh</b><br/><i>each row links its primary source:</i><br/>Treasury · BLS · Freddie Mac · NY Fed"]:::data
+
+  web["<b>reviewer page</b><br/>web/app.py<br/><i>read-only — approves nothing</i>"]:::code
+  writeback["<b>youtube.py</b> — write-back<br/>GUARD: ALMANAC_WRITE=true<br/>AND channel = ALMANAC_TEST_CHANNEL_ID<br/>AND --apply<br/><i>anything else is a dry run</i>"]:::guard
+
+  nightly --> cliRun --> src --> extract --> catalog --> judge
+  manual -.-> catalog
+  rates  -.-> catalog
+  judge -- "stale_material" --> notes --> report
+  judge -- "skip · correct · unresolved" --> report
+  report --> web -- "a human decides" --> writeback
+
+  linkStyle default stroke:#5b6b7a,stroke-width:1.5px;
