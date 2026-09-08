@@ -23,7 +23,12 @@ jobs:
             echo "::error::repo variable ALMANAC_URL is not set — run: gh variable set ALMANAC_URL"
             exit 1
           fi
-          TARGET="${ALMANAC_URL%/}/api/report"
+          # Warm the page a judge actually opens. This used to hit /api/report and require 200,
+          # but reports/latest.json is a build artifact that only exists after a nightly run has
+          # committed one — before that the endpoint correctly returns 503 and the keepalive job
+          # would go red for a host that is perfectly healthy. / is the honest liveness signal;
+          # /api/report is probed below for information, not as a gate.
+          TARGET="${ALMANAC_URL%/}/"
           echo "GET ${TARGET}"
           CODE="$(curl --silent --show-error --location --max-time 60 \
                        --output /tmp/keepalive-body --write-out '%{http_code}' "${TARGET}")"
@@ -42,3 +47,8 @@ jobs:
             echo "::error::HTTP 200 but body is ${BYTES} bytes — host is up but serving nothing"
             exit 1
           fi
+          # Informational: says whether a scan artifact has shipped yet. 503 here is a documented
+          # state, not a failure, so it is reported and not gated on.
+          REPORT_CODE="$(curl --silent --location --max-time 60 --output /dev/null \
+                              --write-out '%{http_code}' "${ALMANAC_URL%/}/api/report")"
+          echo "/api/report -> HTTP ${REPORT_CODE} (503 means no scan artifact deployed yet)"

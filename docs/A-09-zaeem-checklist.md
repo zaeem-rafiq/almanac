@@ -1,126 +1,94 @@
-# A-09 — the four things only Zaeem can do
+# A-09 — the things only Zaeem can do
 
-Everything else in A-09 is built and committed. These four need credentials, so they are yours.
-Rough order of value: **1 and 2 unblock three of the four proofs.** 3 is the deploy itself.
+Everything else in A-09 is built, tested and committed. These need credentials, so they are yours.
 
 Run all of these from `/Users/zaeemkhan/Documents/almanac`.
 
----
-
-## 0. ⛔️ TOP THE ANTHROPIC ACCOUNT UP  ·  blocks the most  ·  DO THIS FIRST
-
-Found by running the nightly sequence for real, not by reading config:
-
-```
-anthropic.BadRequestError: Error code: 400 — 'Your credit balance is too low to access the
-Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.'
-request_id: req_011CepuLRSb1FezG93TyhBKF
-```
-
-**This is wider than A-09.** Every path that calls the model is down: `almanac scan`,
-`/api/lint` on the web page, and A-05's eval harness. Deploying and setting secrets will not
-help until it is cleared — the nightly job would go green on install and then fail at
-`almanac/extract.py:427`, and a live `/api/lint` would return a 400.
-
-<https://console.anthropic.com/settings/billing>
-
-`FMP_API_KEY` is fine — `rates --refresh` ran clean and wrote all four keys.
+> **This file was rewritten on 2026-09-07.** Its first version was written before the extraction
+> engine moved to Gemini on Vertex AI (`038dbe6`) and told you to top up the Anthropic balance, set
+> `ANTHROPIC_API_KEY`, and set `LLM_MODEL=claude-opus-5` on the host. All three are wrong now — the
+> last actively so, since it would send a Claude model id to Vertex. **Do none of them.**
 
 ---
 
-## 1. Log in to Vercel  ·  ~1 min  ·  unblocks proofs 1 and 3
+## 1. Log in to Vercel · ~1 min
 
 ```bash
 export PATH="$HOME/Library/pnpm:$PATH" && vercel login
 ```
 
-Then confirm it took:
-
 ```bash
 export PATH="$HOME/Library/pnpm:$PATH" && vercel whoami
 ```
 
-## 2. Set the three GitHub Actions secrets  ·  ~2 min  ·  unblocks proof 2
+## 2. Create a Vertex AI service-account key · ~3 min · the one genuinely new step
 
-`ANTHROPIC_API_KEY` and `FMP_API_KEY` — paste each value when prompted (nothing is echoed):
+The host has no `gcloud`, so there is no Application Default Credentials file for it to find.
+`google.auth.default()` checks exactly four places — the `GOOGLE_APPLICATION_CREDENTIALS` file, the
+gcloud well-known file, App Engine, and the GCE metadata server — and a Vercel function and a
+GitHub runner have none of them. A key has to be handed in explicitly.
+
+In the Google Cloud console for **`polygraph-hackathon`**: create a service account, grant it
+**Vertex AI User** (`roles/aiplatform.user`), then create a JSON key and download it.
+
+Nothing else on `trainmatch-494604` is touched — the project is named explicitly everywhere.
+
+Then, from wherever the key downloaded:
 
 ```bash
-gh secret set ANTHROPIC_API_KEY
+base64 -i ~/Downloads/polygraph-hackathon-*.json | gh secret set GOOGLE_SERVICE_ACCOUNT_JSON
 ```
+
+```bash
+base64 -i ~/Downloads/polygraph-hackathon-*.json | vercel env add GOOGLE_SERVICE_ACCOUNT_JSON production
+```
+
+`almanac/gcp_credentials.py` decodes it, writes it to a `0600` file, and points
+`GOOGLE_APPLICATION_CREDENTIALS` at it — because google-auth reads a *path* and has no env var for
+inline JSON. It accepts raw JSON too, so an un-base64'd paste also works.
+
+**Delete the downloaded key file afterwards.** It is a private key.
+
+## 3. The other two secrets · ~2 min
 
 ```bash
 gh secret set FMP_API_KEY
 ```
 
-`YT_TOKEN_JSON` is base64 of the local `token.json`, piped straight in so it never lands in your
-shell history:
-
 ```bash
 base64 -i token.json | gh secret set YT_TOKEN_JSON
 ```
 
-**The nightly workflow runs without `YT_TOKEN_JSON`** — it falls back to `--source corpus`. Set it
-only when you want the YouTube path. Note the quota: it is exhausted until midnight Pacific, so a
-YouTube-source run before the reset will fail on 403 regardless of the secret.
+`YT_TOKEN_JSON` is optional: without it the nightly job falls back to `--source corpus` by design.
 
-## 3. Deploy  ·  ~3 min  ·  produces the URL everything else needs
-
-⚠️ **Do this only after A-08 is merged to `main`.** `web/app.py` on `main` is still a 57-byte
-placeholder — the real app is on `claude/stoic-babbage-5e3238` with no PR open yet. Deploying
-before it lands gives you a host that 500s on every route.
-
-```bash
-export PATH="$HOME/Library/pnpm:$PATH" && vercel link --yes
-```
+## 4. Deploy, then tell keepalive where to look
 
 ```bash
 export PATH="$HOME/Library/pnpm:$PATH" && vercel deploy --prod
 ```
 
-Then set the two host env vars. `ALMANAC_WRITE` stays **unset** and there is deliberately **no
-`FMP_API_KEY`** on the host — the app reads `facts/rates.json`:
-
 ```bash
-export PATH="$HOME/Library/pnpm:$PATH" && vercel env add ANTHROPIC_API_KEY production
+gh variable set ALMANAC_URL --body "https://<the-url-vercel-printed>"
 ```
-
-```bash
-printf 'claude-opus-5' | vercel env add LLM_MODEL production
-```
-
-Redeploy so the env vars take effect:
-
-```bash
-export PATH="$HOME/Library/pnpm:$PATH" && vercel deploy --prod
-```
-
-## 4. Tell the keepalive workflow where to curl  ·  ~30 s
-
-Paste the deployment URL from step 3 (no trailing slash, e.g. `https://almanac-xxxx.vercel.app`):
-
-```bash
-gh variable set ALMANAC_URL
-```
-
-This is a repo **variable**, not a secret — the keepalive job fails loudly with a clear message if
-it is unset, rather than curling nothing and reporting green.
 
 ---
 
-## Then hand it back
+## What is already handled
 
-Reply with the deployment URL and I will run the four proofs and close them out. Or run them
-yourself:
+| | |
+|---|---|
+| `evals/` reaches the host | `.vercelignore` no longer excludes it; `vercel.json` `includeFiles` lists it. Excluding it made `web/app.py` raise `FileNotFoundError` at import and 500 **every** route. |
+| the app survives without it anyway | `_load_measured` degrades instead of crashing (`94c13d7`), and the page says so rather than printing `undefined`. |
+| `google-genai` is installed on the host | It was missing from `requirements.txt`, which pinned `anthropic==1.4.0` instead — a clean install then `ImportError`ed inside `/api/lint`. |
+| `client_secret.json` cannot be uploaded | Added to `.vercelignore`. A `.vercelignore` makes the CLI ignore `.gitignore`, so gitignored secrets must be re-listed. |
+| keepalive does not go red on a healthy host | It curled `/api/report` and demanded 200, but that returns a documented 503 until a nightly run commits a scan. It now warms `/` and reports `/api/report` without gating on it. |
+
+## Known gap
+
+`reports/latest.json` is a gitignored build artifact, so a fresh deploy has no scan to serve and
+`/api/report` returns 503 until the first nightly run commits one. Trigger it by hand after
+deploying if you want the report populated before judging:
 
 ```bash
-gh workflow run nightly.yml && sleep 45 && gh run list --workflow=nightly.yml --limit 1
+gh workflow run nightly
 ```
-
-## Fallback hosts, if Vercel refuses
-
-`flyctl` and `render` are **not installed** on this machine — a fallback needs an install first:
-
-```bash
-brew install flyctl
-```
-

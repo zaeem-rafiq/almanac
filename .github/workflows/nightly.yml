@@ -60,10 +60,23 @@ jobs:
         # ALMANAC_WRITE is deliberately unset: the write guard in almanac/youtube.py keeps
         # videos.update dry-run unless it is true AND --apply was passed. Nothing here mutates
         # YouTube.
+        # Extraction runs on Gemini via Vertex AI (038dbe6). This step used to pass
+        # ANTHROPIC_API_KEY and default LLM_MODEL to claude-opus-5 — the first is read by nothing,
+        # and the second would send a Claude model id to Vertex. A runner has no gcloud, so the
+        # service-account key is handed over as a string and almanac/gcp_credentials.py writes it
+        # to a file, which is the only form google-auth accepts.
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          LLM_MODEL: ${{ vars.LLM_MODEL || 'claude-opus-5' }}
-        run: python -m almanac scan --source "${{ steps.source.outputs.source }}" --out reports/
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_CLOUD_PROJECT: ${{ vars.GOOGLE_CLOUD_PROJECT || 'polygraph-hackathon' }}
+          GOOGLE_CLOUD_LOCATION: ${{ vars.GOOGLE_CLOUD_LOCATION || 'global' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GOOGLE_SERVICE_ACCOUNT_JSON:-}" ]; then
+            echo "::error::secret GOOGLE_SERVICE_ACCOUNT_JSON is not set — extraction cannot"\
+                 " authenticate to Vertex AI. Set it with: gh secret set GOOGLE_SERVICE_ACCOUNT_JSON"
+            exit 1
+          fi
+          python -m almanac scan --source "${{ steps.source.outputs.source }}" --out reports/
 
       - name: Commit and push
         run: |
