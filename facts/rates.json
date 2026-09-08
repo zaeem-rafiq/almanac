@@ -3,7 +3,7 @@
     "value": 3.36,
     "as_of": "2026-07-01",
     "fetched_via": "bls",
-    "fetched_at": "2026-09-07T17:57:48.751577Z",
+    "fetched_at": "2026-09-08T11:58:04.369891Z",
     "primary_source_url": "https://data.bls.gov/timeseries/CUUR0000SA0",
     "detail": "CUUR0000SA0 2026-M07=333.918 vs 2025-M07=323.048"
   },
@@ -11,7 +11,7 @@
     "value": 3.63,
     "as_of": "2026-09-03",
     "fetched_via": "nyfed",
-    "fetched_at": "2026-09-07T17:57:28.739925Z",
+    "fetched_at": "2026-09-08T11:57:47.261025Z",
     "primary_source_url": "https://www.newyorkfed.org/markets/reference-rates/effr",
     "detail": null
   },
@@ -19,7 +19,7 @@
     "value": 6.71,
     "as_of": "2026-09-03",
     "fetched_via": "freddiemac",
-    "fetched_at": "2026-09-07T17:57:28.921828Z",
+    "fetched_at": "2026-09-08T11:57:47.729151Z",
     "primary_source_url": "https://www.freddiemac.com/pmms",
     "detail": "column=pmms30"
   },
@@ -27,7 +27,7 @@
     "value": 4.78,
     "as_of": "2026-09-04",
     "fetched_via": "treasury",
-    "fetched_at": "2026-09-07T17:57:48.460890Z",
+    "fetched_at": "2026-09-08T11:58:04.058800Z",
     "primary_source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve",
     "detail": "field=BC_10YEAR"
   }
