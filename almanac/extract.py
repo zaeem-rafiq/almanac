@@ -444,8 +444,13 @@ def _client():
     from google import genai
 
     from almanac.cli import load_env
+    from almanac.gcp_credentials import ensure_credentials
 
     load_env()
+    # A host with no gcloud (Vercel, an Actions runner) has no ADC at all. If a service-account
+    # key was supplied in the environment, turn it into the file google-auth insists on before
+    # the client is built. A no-op locally, where real ADC is already present.
+    ensure_credentials()
     project = os.environ.get("GOOGLE_CLOUD_PROJECT", DEFAULT_PROJECT)
     location = os.environ.get("GOOGLE_CLOUD_LOCATION", DEFAULT_LOCATION)
     model = os.environ.get("LLM_MODEL", DEFAULT_MODEL)
