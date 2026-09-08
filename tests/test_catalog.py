@@ -106,6 +106,29 @@ def test_stale_manual_fact_is_flagged(monkeypatch):
     assert fact.value == 23500.0, "a stale fact must still carry its value"
 
 
+def test_today_is_the_local_calendar_date():
+    """The catalog holds statutory dates with no timezone; "today" must not come from UTC.
+
+    test_manual_fact_with_effective_to_is_not_stale caught this, but only between UTC midnight and
+    local midnight -- it was green for most of the day and red for the rest. This pins the cause
+    directly, so the guard does not depend on what time the suite happens to run.
+    """
+    assert catalog._today() == date.today()
+
+
+def test_window_closing_today_is_still_open(monkeypatch):
+    """The boundary itself: effective_to == today means the last valid day, not the first stale one."""
+    day = date(2026, 1, 15)
+    entry = CatalogEntry(
+        key="ira_contribution", label="t", kind="statutory_limit", source="manual", unit="usd",
+        value=7000.0, effective_from=date(2025, 1, 1), effective_to=day,
+        source_url="https://www.irs.gov/",
+    )
+    monkeypatch.setattr(catalog, "load_catalog", lambda *a, **k: {entry.key: entry})
+    assert current(entry.key, today=day).stale is False
+    assert current(entry.key, today=day + timedelta(days=1)).stale is True
+
+
 def test_manual_fact_with_effective_to_is_not_stale(monkeypatch):
     """A closed window is deliberate history, not neglect."""
     old = date.today() - timedelta(days=MANUAL_MAX_AGE_DAYS + 30)
