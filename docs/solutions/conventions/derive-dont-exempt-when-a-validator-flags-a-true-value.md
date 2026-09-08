@@ -129,6 +129,8 @@ reports/latest.json (derived)  ->  {83.0, 83.0, 5.0}
 
 - [negative-controls-for-absence-checks](negative-controls-for-absence-checks.md) — the parent rule;
   this doc extends it from "control at first writing" to "control after every widening"
+- [a-checks-coverage-is-itself-a-claim](a-checks-coverage-is-itself-a-claim.md) — the third
+  question: what this check can never see, however well it works
 - [`scripts/proof_a10.py`](../../../scripts/proof_a10.py) — `derived_from_report()` and the two
   surviving `ALLOWED_UNGROUNDED` entries
 - [`docs/proofs/A-10.md`](../../proofs/A-10.md) — the FAIL, the fix, and the re-run control in sequence
