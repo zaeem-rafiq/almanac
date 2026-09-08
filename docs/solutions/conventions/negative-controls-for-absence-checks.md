@@ -107,6 +107,8 @@ shape that had previously succeeded proved the guard was actually wired in front
 
 - [derive-dont-exempt-when-a-validator-flags-a-true-value](derive-dont-exempt-when-a-validator-flags-a-true-value.md) — extends this rule: the control
   belongs after every *widening* of a check, not only at its first writing
+- [a-checks-coverage-is-itself-a-claim](a-checks-coverage-is-itself-a-claim.md) — the third
+  question: what this check can never see, however well it works
 - [`docs/proofs/A-10.md`](../../proofs/A-10.md) — the four proof lines and their controls
 - [`scripts/proof_a10.py`](../../../scripts/proof_a10.py) — the harness, with both bug fixes
 - [`docs/walkthroughs/A-10.md`](../../walkthroughs/A-10.md) — why two proof lines were deliberately
