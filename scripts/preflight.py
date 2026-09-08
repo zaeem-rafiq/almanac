@@ -30,20 +30,6 @@ TOKEN_PATH = ROOT / "token.json"
 CLIENT_SECRET_PATH = ROOT / "client_secret.json"
 YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.force-ssl"]
 
-# ADR-000 gap G-1, RESOLVED 2026-09-07 by observation against the real key:
-#   * /api/v3 and /api/v4 are dead — both 403 with "Legacy Endpoint : ... only available for
-#     legacy users who have valid subscriptions prior August 31, 2025". /stable is the only
-#     live generation, so there is nothing to fall back to and no base discovery to do.
-#   * The indicator path is `economic-indicators` (singular "economic"). The spelling
-#     `economics-indicators` returns 404 with an empty body.
-FMP_BASE = "https://financialmodelingprep.com/stable"
-FMP_INDICATOR_PATH = "economic-indicators"
-# label -> FMP indicator name, in the order the PROOF line lists them.
-FMP_SERIES = {
-    "federalFunds": "federalFunds",
-    "mortgage30": "30YearFixedRateMortgageAverage",
-    "cpi": "CPI",
-}
 
 
 # --------------------------------------------------------------------------- credential-free
@@ -131,57 +117,40 @@ def check_llm() -> tuple[str, bool, str]:
             f"· no model call made")
 
 
-def _fmp_get(base: str, path: str, params: dict[str, str], api_key: str):
-    import requests
+def check_rates() -> tuple[str, bool, str]:
+    """Prove the four rate feeds answer, and report how fresh each one is (gap G-1, KTD3).
 
-    response = requests.get(
-        f"{base}/{path}", params={**params, "apikey": api_key}, timeout=30
-    )
-    if response.status_code != 200:
-        raise RuntimeError(f"HTTP {response.status_code}")
-    return response.json()
+    This used to probe FMP's `economic-indicators` and required FMP_API_KEY, reporting
+    `fmp = FAIL  FMP_API_KEY ABSENT` on a repo that works. ADR-000 §9 dropped FMP during A-01 —
+    it returns a ~9-month-old window and cannot produce `cpi_yoy` at all — and `catalog.FETCHERS`
+    has read the four primary feeds directly ever since. The check was still asking a service the
+    product no longer uses, which is the same defect `fa22cfe` fixed for the Anthropic gate.
 
+    It now calls the very fetchers `rates --refresh` calls, so what preflight proves reachable is
+    what the product actually depends on. All four are keyless, so unlike the FMP probe this needs
+    no credential and costs nothing.
 
-def check_fmp() -> tuple[str, bool, str]:
-    """Prove all four series answer, and report how fresh each one is (gap G-1, KTD3).
-
-    Reports every series' own failure rather than the last one seen — a single run must name
-    each broken series, not just whichever failed most recently.
+    Reports every feed's own failure rather than the last one seen — a single run must name each
+    broken feed, not just whichever failed most recently.
     """
-    api_key = os.environ.get("FMP_API_KEY")
-    if not api_key:
-        return ("fmp", False, "FMP_API_KEY ABSENT")
+    from almanac.catalog import FETCHERS
 
     freshness, failures = [], []
-    for label, name in FMP_SERIES.items():
+    for key, fetch in FETCHERS.items():
         try:
-            rows = _fmp_get(FMP_BASE, FMP_INDICATOR_PATH, {"name": name}, api_key)
+            value, as_of, via, _detail = fetch()
         except Exception as exc:
-            failures.append(f"{label}: {type(exc).__name__} {str(exc)[:60]}")
+            failures.append(f"{key}: {type(exc).__name__} {str(exc)[:60]}")
             continue
-        if not isinstance(rows, list) or not rows:
-            failures.append(f"{label}: 0 rows")
+        if value is None or as_of is None:
+            failures.append(f"{key}: fetcher returned no value")
             continue
-        newest = max(r.get("date", "") for r in rows)
-        freshness.append(f"{label}@{newest}({len(rows)}r)")
+        freshness.append(f"{key}@{as_of}={value:g}({via})")
 
-    try:
-        rows = _fmp_get(FMP_BASE, "treasury-rates", {}, api_key)
-        if not isinstance(rows, list) or not rows:
-            failures.append("treasury10: 0 rows")
-        else:
-            newest_row = max(rows, key=lambda r: r.get("date", ""))
-            if newest_row.get("year10") is None:
-                failures.append("treasury10: newest row has no year10")
-            else:
-                freshness.append(f"treasury10@{newest_row['date']}({len(rows)}r)")
-    except Exception as exc:
-        failures.append(f"treasury10: {type(exc).__name__} {str(exc)[:60]}")
-
-    detail = "base=stable " + " ".join(freshness)
+    detail = "keyless primary feeds " + " ".join(freshness)
     if failures:
-        return ("fmp", False, f"{detail} FAILED[{'; '.join(failures)}]")
-    return ("fmp", True, detail)
+        return ("rates", False, f"{detail} FAILED[{'; '.join(failures)}]")
+    return ("rates", True, detail)
 
 
 def check_youtube() -> tuple[str, bool, str]:
@@ -245,7 +214,7 @@ def check_youtube() -> tuple[str, bool, str]:
 
 # ------------------------------------------------------------------------------------ runner
 
-CHECKS = (check_imports, check_rules, check_remote, check_llm, check_fmp, check_youtube)
+CHECKS = (check_imports, check_rules, check_remote, check_llm, check_rates, check_youtube)
 
 
 def main(argv: list[str]) -> int:
@@ -253,7 +222,7 @@ def main(argv: list[str]) -> int:
     write_proof = "--no-proof" not in argv
 
     print("Almanac pre-flight (A-00)\n" + "-" * 60)
-    for name in ("GOOGLE_CLOUD_PROJECT", "GOOGLE_SERVICE_ACCOUNT_JSON", "FMP_API_KEY",
+    for name in ("GOOGLE_CLOUD_PROJECT", "GOOGLE_SERVICE_ACCOUNT_JSON",
                  "LLM_MODEL", "ALMANAC_TEST_CHANNEL_ID"):
         print(f"  {name:<24} {mask(os.environ.get(name))}")
     print("-" * 60)
@@ -267,13 +236,13 @@ def main(argv: list[str]) -> int:
     def verdict(name: str) -> str:
         return "PASS" if results[name][0] else "FAIL"
 
-    fmp_series = "federalFunds,mortgage30,cpi,treasury10"
+    rate_keys = "fed_funds_effective,mortgage_30y_fixed,treasury_10y,cpi_yoy"
     channel = "UC…"
     if results["youtube_oauth"][0]:
         channel = results["youtube_oauth"][1].split("channel=")[-1].split()[0]
 
     proof_lines = [
-        f"PROOF A-00: llm={verdict('llm')} fmp={verdict('fmp')}({fmp_series}) "
+        f"PROOF A-00: llm={verdict('llm')} rates={verdict('rates')}({rate_keys}) "
         f"youtube_oauth={verdict('youtube_oauth')}(channel={channel}) "
         f"imports={verdict('imports')} remote={verdict('remote')}",
         'PROOF A-00: rules file has trigger: always_on and contains '

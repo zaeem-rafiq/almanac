@@ -34,9 +34,10 @@ jobs:
       - name: Install
         run: pip install -r requirements.txt
 
+      # No credential: the four feeds (NY Fed, Freddie Mac, Treasury, BLS) are keyless, and
+      # `catalog.py` reads no environment variable. This step passed FMP_API_KEY until the FMP
+      # path was retired in ADR-000 §9.
       - name: Refresh rates
-        env:
-          FMP_API_KEY: ${{ secrets.FMP_API_KEY }}
         run: python -m almanac rates --refresh
 
       # The YouTube path needs owner OAuth. When YT_TOKEN_JSON is absent the job still has to
