@@ -86,58 +86,49 @@ def check_remote() -> tuple[str, bool, str]:
 # ------------------------------------------------------------------------------- credentialed
 
 def check_llm() -> tuple[str, bool, str]:
-    """Prove the model answers AND that Pydantic's $defs/$ref schema is accepted (gap G-3)."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
-    model = os.environ.get("LLM_MODEL")
-    if not api_key:
-        return ("llm", False, "ANTHROPIC_API_KEY ABSENT")
-    if not model:
-        return ("llm", False, "LLM_MODEL ABSENT")
+    """Vertex AI credentials resolve, and the response schema the extractor sends still builds.
 
-    from typing import Literal
+    This used to send a live Anthropic tool-use call to prove the model answered and that
+    Pydantic's `$defs`/`$ref` form was accepted (ADR-000 gap G-3). Both halves are obsolete:
+    extraction moved to Gemini on Vertex at `038dbe6`, so the ANTHROPIC_API_KEY this gated on is
+    read by nothing, and on a healthy repo the check reported FAIL — the first thing a new reader
+    runs, telling them the project is broken when it is not.
 
-    import anthropic
-    from pydantic import BaseModel, Field, ValidationError
+    It deliberately makes NO model call. Preflight is run casually and often; a check that bills
+    the account every time is one people learn to skip. What it verifies instead is the thing that
+    actually fails in deployment: `google.auth.default()` finding credentials. `almanac eval`
+    already proves the model answers, thoroughly and on purpose.
+    """
+    from almanac.gcp_credentials import CredentialsUnusable, ensure_credentials
+    from almanac.extract import DEFAULT_LOCATION, DEFAULT_MODEL, DEFAULT_PROJECT, Extraction
 
-    class Claim(BaseModel):
-        text: str = Field(description="the verbatim sentence containing the number")
-        value: float
-        unit: Literal["percent", "usd"]
-
-    class Claims(BaseModel):
-        claims: list[Claim]
-
-    schema = Claims.model_json_schema()
+    schema = Extraction.model_json_schema()
     if "$defs" not in json.dumps(schema):
-        return ("llm", False, "schema lacks $defs — the G-3 question would go untested")
+        return ("llm", False, "the extraction schema lost its $defs — G-3 would go untested")
 
     try:
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model=model,
-            max_tokens=512,
-            tools=[{
-                "name": "record_claims",
-                "description": "Record every numeric claim found in the text.",
-                "input_schema": schema,
-            }],
-            tool_choice={"type": "tool", "name": "record_claims"},
-            messages=[{
-                "role": "user",
-                "content": "Text: 'The federal funds rate is 4.5% and the limit is 23000 dollars.'",
-            }],
+        ensure_credentials()
+    except CredentialsUnusable as exc:
+        return ("llm", False, f"GOOGLE_SERVICE_ACCOUNT_JSON unusable: {exc}")
+
+    try:
+        import google.auth
+
+        _, detected = google.auth.default(
+            scopes=["https://www.googleapis.com/auth/cloud-platform"]
         )
     except Exception as exc:
-        return ("llm", False, f"{type(exc).__name__}: {str(exc)[:200]}")
+        return ("llm", False,
+                f"Vertex credentials do not resolve ({type(exc).__name__}) — "
+                f"run `gcloud auth application-default login`, or set GOOGLE_SERVICE_ACCOUNT_JSON")
 
-    blocks = [b for b in message.content if getattr(b, "type", None) == "tool_use"]
-    if not blocks:
-        return ("llm", False, f"no tool_use block; stop_reason={message.stop_reason}")
-    try:
-        parsed = Claims.model_validate(blocks[0].input)
-    except ValidationError as exc:
-        return ("llm", False, f"tool_use input failed validation: {str(exc)[:200]}")
-    return ("llm", True, f"model={model} $defs accepted, {len(parsed.claims)} claim(s) returned")
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT", DEFAULT_PROJECT)
+    location = os.environ.get("GOOGLE_CLOUD_LOCATION", DEFAULT_LOCATION)
+    model = os.environ.get("LLM_MODEL", DEFAULT_MODEL)
+    note = "" if detected in (None, project) else f" (ADC default project={detected})"
+    return ("llm", True,
+            f"credentials resolve, schema has $defs · {model} @ {project}/{location}{note} "
+            f"· no model call made")
 
 
 def _fmp_get(base: str, path: str, params: dict[str, str], api_key: str):
@@ -262,7 +253,8 @@ def main(argv: list[str]) -> int:
     write_proof = "--no-proof" not in argv
 
     print("Almanac pre-flight (A-00)\n" + "-" * 60)
-    for name in ("ANTHROPIC_API_KEY", "FMP_API_KEY", "LLM_MODEL", "ALMANAC_TEST_CHANNEL_ID"):
+    for name in ("GOOGLE_CLOUD_PROJECT", "GOOGLE_SERVICE_ACCOUNT_JSON", "FMP_API_KEY",
+                 "LLM_MODEL", "ALMANAC_TEST_CHANNEL_ID"):
         print(f"  {name:<24} {mask(os.environ.get(name))}")
     print("-" * 60)
 
