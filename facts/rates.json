@@ -3,31 +3,31 @@
     "value": 3.36,
     "as_of": "2026-07-01",
     "fetched_via": "bls",
-    "fetched_at": "2026-09-10T12:02:26.918368Z",
+    "fetched_at": "2026-09-11T12:00:48.692373Z",
     "primary_source_url": "https://data.bls.gov/timeseries/CUUR0000SA0",
     "detail": "CUUR0000SA0 2026-M07=333.918 vs 2025-M07=323.048"
   },
   "fed_funds_effective": {
     "value": 3.63,
-    "as_of": "2026-09-08",
+    "as_of": "2026-09-09",
     "fetched_via": "nyfed",
-    "fetched_at": "2026-09-10T12:02:08.836694Z",
+    "fetched_at": "2026-09-11T12:00:28.384714Z",
     "primary_source_url": "https://www.newyorkfed.org/markets/reference-rates/effr",
     "detail": null
   },
   "mortgage_30y_fixed": {
-    "value": 6.71,
-    "as_of": "2026-09-03",
+    "value": 6.76,
+    "as_of": "2026-09-10",
     "fetched_via": "freddiemac",
-    "fetched_at": "2026-09-10T12:02:09.336227Z",
+    "fetched_at": "2026-09-11T12:00:28.714348Z",
     "primary_source_url": "https://www.freddiemac.com/pmms",
     "detail": "column=pmms30"
   },
   "treasury_10y": {
-    "value": 4.83,
-    "as_of": "2026-09-09",
+    "value": 4.95,
+    "as_of": "2026-09-10",
     "fetched_via": "treasury",
-    "fetched_at": "2026-09-10T12:02:26.499358Z",
+    "fetched_at": "2026-09-11T12:00:48.381344Z",
     "primary_source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve",
     "detail": "field=BC_10YEAR"
   }

@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-09-10T12:05:58.641116Z",
+  "run_at": "2026-09-11T12:03:54.767147Z",
   "source": "youtube",
   "videos": [
     {
@@ -1228,10 +1228,10 @@
           "unit": "pct",
           "status": "stale_immaterial",
           "rule_fired": "R5.stale_immaterial",
-          "detail": "video says 6.85, mortgage_30y_fixed is 6.71 (+0.14); moved 0.14pp, under the 0.50pp bar",
-          "current_value": 6.71,
-          "current_effective_from": "2026-09-03",
-          "delta": 0.14,
+          "detail": "video says 6.85, mortgage_30y_fixed is 6.76 (+0.09); moved 0.09pp, under the 0.50pp bar",
+          "current_value": 6.76,
+          "current_effective_from": "2026-09-10",
+          "delta": 0.09,
           "source_url": "https://www.freddiemac.com/pmms",
           "fact_stale": false,
           "note": null,
