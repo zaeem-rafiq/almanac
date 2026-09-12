@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-09-11T12:03:54.767147Z",
+  "run_at": "2026-09-12T11:31:06.959837Z",
   "source": "youtube",
   "videos": [
     {
@@ -1392,8 +1392,8 @@
           "delta": -200.0,
           "source_url": "https://www.irs.gov/publications/p969",
           "fact_stale": false,
-          "note": "📌 Update: this video says $8,550. The current figure is $8,750, effective 2026-01-01.",
-          "note_source": "fallback"
+          "note": "📌 The video states family coverage is $8,550, but the figure is $8,750 for 2026.",
+          "note_source": "model"
         },
         {
           "locator": "00:00:39,000",
