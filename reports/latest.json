@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-09-12T11:31:06.959837Z",
+  "run_at": "2026-09-16T12:28:22.522024Z",
   "source": "youtube",
   "videos": [
     {
@@ -1374,8 +1374,8 @@
           "delta": -100.0,
           "source_url": "https://www.irs.gov/publications/p969",
           "fact_stale": false,
-          "note": "📌 Update: this video says $4,300. The current figure is $4,400, effective 2026-01-01.",
-          "note_source": "fallback"
+          "note": "📌 In the video I mentioned $4,300, but the limit is $4,400 for 2026.",
+          "note_source": "model"
         },
         {
           "locator": "00:00:21,000",
@@ -1392,8 +1392,8 @@
           "delta": -200.0,
           "source_url": "https://www.irs.gov/publications/p969",
           "fact_stale": false,
-          "note": "📌 The video states family coverage is $8,550, but the figure is $8,750 for 2026.",
-          "note_source": "model"
+          "note": "📌 Update: this video says $8,550. The current figure is $8,750, effective 2026-01-01.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:00:39,000",
@@ -1536,8 +1536,8 @@
           "delta": -350.0,
           "source_url": "https://www.irs.gov/pub/irs-drop/rp-25-32.pdf",
           "fact_stale": false,
-          "note": "📌 Update: this video says $15,750. The current figure is $16,100, effective 2026-01-01.",
-          "note_source": "fallback"
+          "note": "0; for 2026, the figure is $16,100.",
+          "note_source": "model"
         },
         {
           "locator": "00:02:27,000",
