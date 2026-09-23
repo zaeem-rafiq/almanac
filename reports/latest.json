@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-09-16T12:28:22.522024Z",
+  "run_at": "2026-09-23T12:41:01.473693Z",
   "source": "youtube",
   "videos": [
     {
@@ -22,8 +22,8 @@
           "delta": -1.15,
           "source_url": "https://www.treasurydirect.gov/files/savings-bonds/i-bond-rate-chart.pdf",
           "fact_stale": false,
-          "note": "📌 Update: this video says 3.11%. The current figure is 4.26%, effective 2026-05-01.",
-          "note_source": "fallback"
+          "note": "📌 The video states the composite rate was 3.11%, but the current figure is 4.26% effective May 1, 2026.",
+          "note_source": "model"
         },
         {
           "locator": "00:00:18,000",
@@ -189,7 +189,7 @@
         },
         {
           "locator": "00:02:00,000",
-          "quote": "earmarked for something two",
+          "quote": "Money you have earmarked for something two",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 2.0,
@@ -207,7 +207,7 @@
         },
         {
           "locator": "00:02:03,000",
-          "quote": "or three years out",
+          "quote": "or three years out is where the bond gets interesting",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 3.0,
@@ -293,7 +293,7 @@
         },
         {
           "locator": "00:00:18,000",
-          "quote": "and this ten thousand is genuinely spare",
+          "quote": "and this ten thousand is genuinely spare.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 10000.0,
@@ -477,7 +477,7 @@
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 60.0,
-          "unit": "pct",
+          "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=illustrative is not checked against the facts table",
@@ -491,11 +491,11 @@
         },
         {
           "locator": "00:01:15,000",
-          "quote": "forty",
+          "quote": "go sixty forty,",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 40.0,
-          "unit": "pct",
+          "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=illustrative is not checked against the facts table",
@@ -513,7 +513,7 @@
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 80.0,
-          "unit": "pct",
+          "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=illustrative is not checked against the facts table",
@@ -527,11 +527,11 @@
         },
         {
           "locator": "00:01:18,000",
-          "quote": "twenty if you are younger",
+          "quote": "eighty twenty if you are younger",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 20.0,
-          "unit": "pct",
+          "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=illustrative is not checked against the facts table",
@@ -599,7 +599,7 @@
         },
         {
           "locator": "00:01:42,000",
-          "quote": "a lump sum roughly doubles about three and a half times",
+          "quote": "about three and a half times.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 3.5,
@@ -775,7 +775,7 @@
         },
         {
           "locator": "00:00:24,000",
-          "quote": "If you are fifty or older",
+          "quote": "If you are fifty or older there is a catch up on top of that",
           "claim_type": "structural",
           "entity_key": null,
           "claimed_value": 50.0,
@@ -828,8 +828,26 @@
           "note_source": null
         },
         {
+          "locator": "00:00:48,000",
+          "quote": "There is one more threshold worth knowing about, and it has a boring name.",
+          "claim_type": "other",
+          "entity_key": null,
+          "claimed_value": 1.0,
+          "unit": null,
+          "status": "skip",
+          "rule_fired": "R2.unjudged_claim_type",
+          "detail": "claim_type=other is not checked against the facts table",
+          "current_value": null,
+          "current_effective_from": null,
+          "delta": null,
+          "source_url": null,
+          "fact_stale": false,
+          "note": null,
+          "note_source": null
+        },
+        {
           "locator": "00:00:54,000",
-          "quote": "If you earn more than one hundred fifty five thousand dollars you are a highly compensated employee, and your plan may limit what you can defer regardless of the headline number.",
+          "quote": "If you earn more than one hundred fifty five thousand dollars you are a highly compensated employee",
           "claim_type": "statutory_limit",
           "entity_key": null,
           "claimed_value": 155000.0,
@@ -973,7 +991,7 @@
         },
         {
           "locator": "00:01:21,000",
-          "quote": "If you dump five hundred dollars a month in January",
+          "quote": "If you dump five hundred dollars a month in January and hit the ceiling in September",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 500.0,
@@ -1049,7 +1067,7 @@
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 1.0,
-          "unit": "pct",
+          "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=other is not checked against the facts table",
@@ -1085,7 +1103,7 @@
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 1.0,
-          "unit": "pct",
+          "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=other is not checked against the facts table",
@@ -1100,13 +1118,13 @@
         {
           "locator": "00:02:09,000",
           "quote": "I have watched people go from three percent",
-          "claim_type": "illustrative",
+          "claim_type": "other",
           "entity_key": null,
           "claimed_value": 3.0,
           "unit": "pct",
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
-          "detail": "claim_type=illustrative is not checked against the facts table",
+          "detail": "claim_type=other is not checked against the facts table",
           "current_value": null,
           "current_effective_from": null,
           "delta": null,
@@ -1118,13 +1136,13 @@
         {
           "locator": "00:02:12,000",
           "quote": "to fifteen percent this way without ever once feeling poorer.",
-          "claim_type": "illustrative",
+          "claim_type": "other",
           "entity_key": null,
           "claimed_value": 15.0,
           "unit": "pct",
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
-          "detail": "claim_type=illustrative is not checked against the facts table",
+          "detail": "claim_type=other is not checked against the facts table",
           "current_value": null,
           "current_effective_from": null,
           "delta": null,
@@ -1139,7 +1157,7 @@
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 1.0,
-          "unit": "pct",
+          "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=other is not checked against the facts table",
@@ -1153,7 +1171,7 @@
         }
       ],
       "counts": {
-        "skip": 19,
+        "skip": 20,
         "correct": 0,
         "stale_material": 2,
         "stale_immaterial": 0,
@@ -1228,10 +1246,10 @@
           "unit": "pct",
           "status": "stale_immaterial",
           "rule_fired": "R5.stale_immaterial",
-          "detail": "video says 6.85, mortgage_30y_fixed is 6.76 (+0.09); moved 0.09pp, under the 0.50pp bar",
-          "current_value": 6.76,
-          "current_effective_from": "2026-09-10",
-          "delta": 0.09,
+          "detail": "video says 6.85, mortgage_30y_fixed is 6.95 (-0.1); moved 0.10pp, under the 0.50pp bar",
+          "current_value": 6.95,
+          "current_effective_from": "2026-09-17",
+          "delta": -0.1,
           "source_url": "https://www.freddiemac.com/pmms",
           "fact_stale": false,
           "note": null,
@@ -1374,8 +1392,8 @@
           "delta": -100.0,
           "source_url": "https://www.irs.gov/publications/p969",
           "fact_stale": false,
-          "note": "📌 In the video I mentioned $4,300, but the limit is $4,400 for 2026.",
-          "note_source": "model"
+          "note": "📌 Update: this video says $4,300. The current figure is $4,400, effective 2026-01-01.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:00:21,000",
@@ -1392,8 +1410,8 @@
           "delta": -200.0,
           "source_url": "https://www.irs.gov/publications/p969",
           "fact_stale": false,
-          "note": "📌 Update: this video says $8,550. The current figure is $8,750, effective 2026-01-01.",
-          "note_source": "fallback"
+          "note": "📌 The video states family coverage is $8,550, but the limit for 2026 is $8,750.",
+          "note_source": "model"
         },
         {
           "locator": "00:00:39,000",
@@ -1469,7 +1487,7 @@
         },
         {
           "locator": "00:01:39,000",
-          "quote": "After sixty five it behaves like a traditional retirement account for non medical spending, which is a fine consolation prize.",
+          "quote": "After sixty five it behaves like a traditional retirement account for non medical spending",
           "claim_type": "structural",
           "entity_key": null,
           "claimed_value": 65.0,
@@ -1536,8 +1554,8 @@
           "delta": -350.0,
           "source_url": "https://www.irs.gov/pub/irs-drop/rp-25-32.pdf",
           "fact_stale": false,
-          "note": "0; for 2026, the figure is $16,100.",
-          "note_source": "model"
+          "note": "📌 Update: this video says $15,750. The current figure is $16,100, effective 2026-01-01.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:02:27,000",
@@ -1568,7 +1586,7 @@
     }
   ],
   "counts": {
-    "skip": 72,
+    "skip": 73,
     "correct": 1,
     "stale_material": 6,
     "stale_immaterial": 1,
