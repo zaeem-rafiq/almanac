@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-09-23T12:41:01.473693Z",
+  "run_at": "2026-09-26T12:10:21.337544Z",
   "source": "youtube",
   "videos": [
     {
@@ -22,8 +22,8 @@
           "delta": -1.15,
           "source_url": "https://www.treasurydirect.gov/files/savings-bonds/i-bond-rate-chart.pdf",
           "fact_stale": false,
-          "note": "📌 The video states the composite rate was 3.11%, but the current figure is 4.26% effective May 1, 2026.",
-          "note_source": "model"
+          "note": "📌 Update: this video says 3.11%. The current figure is 4.26%, effective 2026-05-01.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:00:18,000",
@@ -1246,10 +1246,10 @@
           "unit": "pct",
           "status": "stale_immaterial",
           "rule_fired": "R5.stale_immaterial",
-          "detail": "video says 6.85, mortgage_30y_fixed is 6.95 (-0.1); moved 0.10pp, under the 0.50pp bar",
-          "current_value": 6.95,
-          "current_effective_from": "2026-09-17",
-          "delta": -0.1,
+          "detail": "video says 6.85, mortgage_30y_fixed is 7.03 (-0.18); moved 0.18pp, under the 0.50pp bar",
+          "current_value": 7.03,
+          "current_effective_from": "2026-09-24",
+          "delta": -0.18,
           "source_url": "https://www.freddiemac.com/pmms",
           "fact_stale": false,
           "note": null,
@@ -1410,8 +1410,8 @@
           "delta": -200.0,
           "source_url": "https://www.irs.gov/publications/p969",
           "fact_stale": false,
-          "note": "📌 The video states family coverage is $8,550, but the limit for 2026 is $8,750.",
-          "note_source": "model"
+          "note": "📌 Update: this video says $8,550. The current figure is $8,750, effective 2026-01-01.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:00:39,000",
