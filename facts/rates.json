@@ -3,15 +3,15 @@
     "value": 3.4,
     "as_of": "2026-08-01",
     "fetched_via": "bls",
-    "fetched_at": "2026-09-30T13:19:40.419803Z",
+    "fetched_at": "2026-10-01T14:09:30.789080Z",
     "primary_source_url": "https://data.bls.gov/timeseries/CUUR0000SA0",
     "detail": "CUUR0000SA0 2026-M08=334.98 vs 2025-M08=323.976"
   },
   "fed_funds_effective": {
     "value": 3.88,
-    "as_of": "2026-09-29",
+    "as_of": "2026-09-30",
     "fetched_via": "nyfed",
-    "fetched_at": "2026-09-30T13:19:20.258792Z",
+    "fetched_at": "2026-10-01T14:09:10.284876Z",
     "primary_source_url": "https://www.newyorkfed.org/markets/reference-rates/effr",
     "detail": null
   },
@@ -19,15 +19,15 @@
     "value": 7.03,
     "as_of": "2026-09-24",
     "fetched_via": "freddiemac",
-    "fetched_at": "2026-09-30T13:19:20.790762Z",
+    "fetched_at": "2026-10-01T14:09:10.396757Z",
     "primary_source_url": "https://www.freddiemac.com/pmms",
     "detail": "column=pmms30"
   },
   "treasury_10y": {
-    "value": 5.26,
-    "as_of": "2026-09-29",
+    "value": 5.29,
+    "as_of": "2026-09-30",
     "fetched_via": "treasury",
-    "fetched_at": "2026-09-30T13:19:40.081172Z",
+    "fetched_at": "2026-10-01T14:09:30.544601Z",
     "primary_source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve",
     "detail": "field=BC_10YEAR"
   }
