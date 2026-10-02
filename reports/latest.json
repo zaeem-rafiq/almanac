@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-01T14:21:34.895152Z",
+  "run_at": "2026-10-02T13:35:35.937149Z",
   "source": "youtube",
   "videos": [
     {
@@ -45,10 +45,10 @@
         },
         {
           "locator": "00:00:21,000",
-          "quote": "it resets on the first of May and the first of November",
+          "quote": "and it resets on the first of May",
           "claim_type": "structural",
           "entity_key": null,
-          "claimed_value": null,
+          "claimed_value": 1.0,
           "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
@@ -135,7 +135,7 @@
         },
         {
           "locator": "00:01:12,000",
-          "quote": "after five years it disappears entirely.",
+          "quote": "and after five years it disappears entirely.",
           "claim_type": "structural",
           "entity_key": null,
           "claimed_value": 5.0,
@@ -770,8 +770,8 @@
           "delta": -1500.0,
           "source_url": "https://www.irs.gov/retirement-plans/cola-increases-for-dollar-limitations-on-benefits-and-contributions",
           "fact_stale": false,
-          "note": "📌 Update: this video says $23,000. The current figure is $24,500, effective 2026-01-01.",
-          "note_source": "fallback"
+          "note": ") employee deferral limit for 2026 is $24,500",
+          "note_source": "model"
         },
         {
           "locator": "00:00:24,000",
@@ -1246,10 +1246,10 @@
           "unit": "pct",
           "status": "stale_immaterial",
           "rule_fired": "R5.stale_immaterial",
-          "detail": "video says 6.85, mortgage_30y_fixed is 7.03 (-0.18); moved 0.18pp, under the 0.50pp bar",
-          "current_value": 7.03,
-          "current_effective_from": "2026-09-24",
-          "delta": -0.18,
+          "detail": "video says 6.85, mortgage_30y_fixed is 7.28 (-0.43); moved 0.43pp, under the 0.50pp bar",
+          "current_value": 7.28,
+          "current_effective_from": "2026-10-01",
+          "delta": -0.43,
           "source_url": "https://www.freddiemac.com/pmms",
           "fact_stale": false,
           "note": null,
@@ -1392,8 +1392,8 @@
           "delta": -100.0,
           "source_url": "https://www.irs.gov/publications/p969",
           "fact_stale": false,
-          "note": "📌 The video mentions $4,300, but the limit is $4,400 for 2026.",
-          "note_source": "model"
+          "note": "📌 Update: this video says $4,300. The current figure is $4,400, effective 2026-01-01.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:00:21,000",
@@ -1554,8 +1554,8 @@
           "delta": -350.0,
           "source_url": "https://www.irs.gov/pub/irs-drop/rp-25-32.pdf",
           "fact_stale": false,
-          "note": "📌 The video mentions a standard deduction of $15,750, but the figure for 2026 is $16,100.",
-          "note_source": "model"
+          "note": "📌 Update: this video says $15,750. The current figure is $16,100, effective 2026-01-01.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:02:27,000",
