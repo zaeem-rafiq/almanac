@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-02T13:35:35.937149Z",
+  "run_at": "2026-10-03T12:16:08.241500Z",
   "source": "youtube",
   "videos": [
     {
@@ -45,10 +45,10 @@
         },
         {
           "locator": "00:00:21,000",
-          "quote": "and it resets on the first of May",
+          "quote": "it resets on the first of May and the first of November",
           "claim_type": "structural",
           "entity_key": null,
-          "claimed_value": 1.0,
+          "claimed_value": null,
           "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
@@ -135,7 +135,7 @@
         },
         {
           "locator": "00:01:12,000",
-          "quote": "and after five years it disappears entirely.",
+          "quote": "after five years it disappears entirely.",
           "claim_type": "structural",
           "entity_key": null,
           "claimed_value": 5.0,
@@ -293,7 +293,7 @@
         },
         {
           "locator": "00:00:18,000",
-          "quote": "and this ten thousand is genuinely spare.",
+          "quote": "and this ten thousand is genuinely spare",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 10000.0,
@@ -347,7 +347,7 @@
         },
         {
           "locator": "00:00:33,000",
-          "quote": "and one thousand is enough to cover the ordinary version of almost every emergency.",
+          "quote": "one thousand is enough to cover the ordinary version of almost every emergency",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 1000.0,
@@ -473,11 +473,11 @@
         },
         {
           "locator": "00:01:15,000",
-          "quote": "Say you go sixty",
+          "quote": "sixty percent stocks",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 60.0,
-          "unit": null,
+          "unit": "pct",
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=illustrative is not checked against the facts table",
@@ -490,12 +490,12 @@
           "note_source": null
         },
         {
-          "locator": "00:01:15,000",
-          "quote": "go sixty forty,",
+          "locator": "00:01:18,000",
+          "quote": "and forty percent bonds",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 40.0,
-          "unit": null,
+          "unit": "pct",
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=illustrative is not checked against the facts table",
@@ -513,7 +513,7 @@
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 80.0,
-          "unit": null,
+          "unit": "pct",
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=illustrative is not checked against the facts table",
@@ -527,11 +527,11 @@
         },
         {
           "locator": "00:01:18,000",
-          "quote": "eighty twenty if you are younger",
+          "quote": "twenty if you are younger and you genuinely will not flinch",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 20.0,
-          "unit": null,
+          "unit": "pct",
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=illustrative is not checked against the facts table",
@@ -599,7 +599,7 @@
         },
         {
           "locator": "00:01:42,000",
-          "quote": "about three and a half times.",
+          "quote": "doubles about three and a half times",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 3.5,
@@ -707,14 +707,14 @@
         },
         {
           "locator": "00:02:24,000",
-          "quote": "because waiting for a better entry point is how people spend four years in cash.",
-          "claim_type": "other",
+          "quote": "waiting for a better entry point is how people spend four years in cash.",
+          "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 4.0,
           "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
-          "detail": "claim_type=other is not checked against the facts table",
+          "detail": "claim_type=illustrative is not checked against the facts table",
           "current_value": null,
           "current_effective_from": null,
           "delta": null,
@@ -770,8 +770,8 @@
           "delta": -1500.0,
           "source_url": "https://www.irs.gov/retirement-plans/cola-increases-for-dollar-limitations-on-benefits-and-contributions",
           "fact_stale": false,
-          "note": ") employee deferral limit for 2026 is $24,500",
-          "note_source": "model"
+          "note": "📌 Update: this video says $23,000. The current figure is $24,500, effective 2026-01-01.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:00:24,000",
