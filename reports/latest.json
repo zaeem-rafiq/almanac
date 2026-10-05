@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-04T13:04:03.968372Z",
+  "run_at": "2026-10-05T15:34:49.159741Z",
   "source": "youtube",
   "videos": [
     {
@@ -828,6 +828,24 @@
           "note_source": null
         },
         {
+          "locator": "00:00:48,000",
+          "quote": "There is one more threshold worth knowing about, and it has a boring name.",
+          "claim_type": "other",
+          "entity_key": null,
+          "claimed_value": 1.0,
+          "unit": null,
+          "status": "skip",
+          "rule_fired": "R2.unjudged_claim_type",
+          "detail": "claim_type=other is not checked against the facts table",
+          "current_value": null,
+          "current_effective_from": null,
+          "delta": null,
+          "source_url": null,
+          "fact_stale": false,
+          "note": null,
+          "note_source": null
+        },
+        {
           "locator": "00:00:54,000",
           "quote": "If you earn more than one hundred fifty five thousand dollars you are a highly compensated employee",
           "claim_type": "statutory_limit",
@@ -973,7 +991,7 @@
         },
         {
           "locator": "00:01:21,000",
-          "quote": "If you dump five hundred dollars a month in January",
+          "quote": "If you dump five hundred dollars a month in January and hit the ceiling in September",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 500.0,
@@ -1081,7 +1099,7 @@
         },
         {
           "locator": "00:02:03,000",
-          "quote": "One point a year is invisible in your paycheck",
+          "quote": "One point a year is invisible in your paycheck and it is enormous over a decade.",
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 1.0,
@@ -1153,7 +1171,7 @@
         }
       ],
       "counts": {
-        "skip": 19,
+        "skip": 20,
         "correct": 0,
         "stale_material": 2,
         "stale_immaterial": 0,
@@ -1203,7 +1221,7 @@
         },
         {
           "locator": "00:00:18,000",
-          "quote": "you have found an extra five hundred dollars a month you could throw at either side",
+          "quote": "and you have found an extra five hundred dollars a month you could throw at either side.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 500.0,
@@ -1239,7 +1257,7 @@
         },
         {
           "locator": "00:00:36,000",
-          "quote": "say you assume seven percent from a broad market index fund",
+          "quote": "On the other side, say you assume seven percent from a broad market index fund.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 7.0,
@@ -1312,13 +1330,13 @@
         {
           "locator": "00:02:18,000",
           "quote": "Fifteen years of extra payments applied to the wrong bucket is a real thing that happens to real people.",
-          "claim_type": "illustrative",
+          "claim_type": "other",
           "entity_key": null,
           "claimed_value": 15.0,
           "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
-          "detail": "claim_type=illustrative is not checked against the facts table",
+          "detail": "claim_type=other is not checked against the facts table",
           "current_value": null,
           "current_effective_from": null,
           "delta": null,
@@ -1568,7 +1586,7 @@
     }
   ],
   "counts": {
-    "skip": 72,
+    "skip": 73,
     "correct": 1,
     "stale_material": 6,
     "stale_immaterial": 1,
