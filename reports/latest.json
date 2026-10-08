@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-07T14:14:15.294892Z",
+  "run_at": "2026-10-08T14:33:32.098942Z",
   "source": "youtube",
   "videos": [
     {
@@ -1554,8 +1554,8 @@
           "delta": -350.0,
           "source_url": "https://www.irs.gov/pub/irs-drop/rp-25-32.pdf",
           "fact_stale": false,
-          "note": "📌 Update: this video says $15,750. The current figure is $16,100, effective 2026-01-01.",
-          "note_source": "fallback"
+          "note": "📌 The video mentions a $15,750 standard deduction for single filers, but the amount is $16,100 for 2026.",
+          "note_source": "model"
         },
         {
           "locator": "00:02:27,000",
