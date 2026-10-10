@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-08T14:33:32.098942Z",
+  "run_at": "2026-10-10T13:18:51.076997Z",
   "source": "youtube",
   "videos": [
     {
@@ -1244,16 +1244,16 @@
           "entity_key": "mortgage_30y_fixed",
           "claimed_value": 6.85,
           "unit": "pct",
-          "status": "stale_immaterial",
-          "rule_fired": "R5.stale_immaterial",
-          "detail": "video says 6.85, mortgage_30y_fixed is 7.28 (-0.43); moved 0.43pp, under the 0.50pp bar",
-          "current_value": 7.28,
-          "current_effective_from": "2026-10-01",
-          "delta": -0.43,
+          "status": "stale_material",
+          "rule_fired": "R5.stale_material",
+          "detail": "video says 6.85, mortgage_30y_fixed is 7.4 (-0.55); moved 0.55pp, at or over the 0.50pp bar",
+          "current_value": 7.4,
+          "current_effective_from": "2026-10-08",
+          "delta": -0.55,
           "source_url": "https://www.freddiemac.com/pmms",
           "fact_stale": false,
-          "note": null,
-          "note_source": null
+          "note": "📌 Update: this video says 6.85%. The current figure is 7.40%, effective 2026-10-08.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:00:36,000",
@@ -1349,8 +1349,8 @@
       "counts": {
         "skip": 8,
         "correct": 0,
-        "stale_material": 0,
-        "stale_immaterial": 1,
+        "stale_material": 1,
+        "stale_immaterial": 0,
         "unresolved": 0
       }
     },
@@ -1410,8 +1410,8 @@
           "delta": -200.0,
           "source_url": "https://www.irs.gov/publications/p969",
           "fact_stale": false,
-          "note": "📌 Update: this video says $8,550. The current figure is $8,750, effective 2026-01-01.",
-          "note_source": "fallback"
+          "note": "is $8,750.\" -> wait, 2026.",
+          "note_source": "model"
         },
         {
           "locator": "00:00:39,000",
@@ -1554,8 +1554,8 @@
           "delta": -350.0,
           "source_url": "https://www.irs.gov/pub/irs-drop/rp-25-32.pdf",
           "fact_stale": false,
-          "note": "📌 The video mentions a $15,750 standard deduction for single filers, but the amount is $16,100 for 2026.",
-          "note_source": "model"
+          "note": "📌 Update: this video says $15,750. The current figure is $16,100, effective 2026-01-01.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:02:27,000",
@@ -1588,8 +1588,8 @@
   "counts": {
     "skip": 73,
     "correct": 1,
-    "stale_material": 6,
-    "stale_immaterial": 1,
+    "stale_material": 7,
+    "stale_immaterial": 0,
     "unresolved": 3
   }
 }
