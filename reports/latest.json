@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-10T13:18:51.076997Z",
+  "run_at": "2026-10-11T13:47:39.663796Z",
   "source": "youtube",
   "videos": [
     {
@@ -1252,8 +1252,8 @@
           "delta": -0.55,
           "source_url": "https://www.freddiemac.com/pmms",
           "fact_stale": false,
-          "note": "📌 Update: this video says 6.85%. The current figure is 7.40%, effective 2026-10-08.",
-          "note_source": "fallback"
+          "note": "7.40% is present.\n    *   *Year \"2026\":",
+          "note_source": "model"
         },
         {
           "locator": "00:00:36,000",
@@ -1410,12 +1410,12 @@
           "delta": -200.0,
           "source_url": "https://www.irs.gov/publications/p969",
           "fact_stale": false,
-          "note": "is $8,750.\" -> wait, 2026.",
-          "note_source": "model"
+          "note": "📌 Update: this video says $8,550. The current figure is $8,750, effective 2026-01-01.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:00:39,000",
-          "quote": "you can pull that money out of the account tax free in twenty years.",
+          "quote": "you can pull that money out of the account tax free in twenty years",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 20.0,
@@ -1487,7 +1487,7 @@
         },
         {
           "locator": "00:01:39,000",
-          "quote": "After sixty five it behaves like a traditional retirement account for non medical spending",
+          "quote": "After sixty five it behaves like a traditional retirement account for non medical spending, which is a fine consolation prize.",
           "claim_type": "structural",
           "entity_key": null,
           "claimed_value": 65.0,
