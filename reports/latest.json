@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-11T13:47:39.663796Z",
+  "run_at": "2026-10-13T14:49:17.321924Z",
   "source": "youtube",
   "videos": [
     {
@@ -45,10 +45,10 @@
         },
         {
           "locator": "00:00:21,000",
-          "quote": "it resets on the first of May and the first of November",
+          "quote": "and it resets on the first of May",
           "claim_type": "structural",
           "entity_key": null,
-          "claimed_value": null,
+          "claimed_value": 1.0,
           "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
@@ -135,7 +135,7 @@
         },
         {
           "locator": "00:01:12,000",
-          "quote": "after five years it disappears entirely.",
+          "quote": "and after five years it disappears entirely.",
           "claim_type": "structural",
           "entity_key": null,
           "claimed_value": 5.0,
@@ -293,7 +293,7 @@
         },
         {
           "locator": "00:00:18,000",
-          "quote": "and this ten thousand is genuinely spare.",
+          "quote": "and this ten thousand is genuinely spare",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 10000.0,
@@ -473,7 +473,7 @@
         },
         {
           "locator": "00:01:15,000",
-          "quote": "Say you go sixty",
+          "quote": "Say you go sixty forty",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 60.0,
@@ -490,12 +490,12 @@
           "note_source": null
         },
         {
-          "locator": "00:01:15,000",
-          "quote": "go sixty forty,",
+          "locator": "00:01:18,000",
+          "quote": "and forty percent bonds.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 40.0,
-          "unit": null,
+          "unit": "pct",
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=illustrative is not checked against the facts table",
@@ -509,28 +509,10 @@
         },
         {
           "locator": "00:01:18,000",
-          "quote": "Or eighty",
+          "quote": "Or eighty twenty if you are younger",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 80.0,
-          "unit": null,
-          "status": "skip",
-          "rule_fired": "R2.unjudged_claim_type",
-          "detail": "claim_type=illustrative is not checked against the facts table",
-          "current_value": null,
-          "current_effective_from": null,
-          "delta": null,
-          "source_url": null,
-          "fact_stale": false,
-          "note": null,
-          "note_source": null
-        },
-        {
-          "locator": "00:01:18,000",
-          "quote": "eighty twenty if you are younger",
-          "claim_type": "illustrative",
-          "entity_key": null,
-          "claimed_value": 20.0,
           "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
@@ -599,7 +581,7 @@
         },
         {
           "locator": "00:01:42,000",
-          "quote": "about three and a half times.",
+          "quote": "doubles about three and a half times.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 3.5,
@@ -707,7 +689,7 @@
         },
         {
           "locator": "00:02:24,000",
-          "quote": "because waiting for a better entry point is how people spend four years in cash.",
+          "quote": "waiting for a better entry point is how people spend four years in cash.",
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 4.0,
@@ -725,7 +707,7 @@
         }
       ],
       "counts": {
-        "skip": 27,
+        "skip": 26,
         "correct": 0,
         "stale_material": 0,
         "stale_immaterial": 0,
@@ -1221,7 +1203,7 @@
         },
         {
           "locator": "00:00:18,000",
-          "quote": "and you have found an extra five hundred dollars a month you could throw at either side.",
+          "quote": "you have found an extra five hundred dollars a month you could throw at either side",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 500.0,
@@ -1252,12 +1234,12 @@
           "delta": -0.55,
           "source_url": "https://www.freddiemac.com/pmms",
           "fact_stale": false,
-          "note": "7.40% is present.\n    *   *Year \"2026\":",
-          "note_source": "model"
+          "note": "📌 Update: this video says 6.85%. The current figure is 7.40%, effective 2026-10-08.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:00:36,000",
-          "quote": "On the other side, say you assume seven percent from a broad market index fund.",
+          "quote": "say you assume seven percent from a broad market index fund",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 7.0,
@@ -1310,8 +1292,8 @@
           "note_source": null
         },
         {
-          "locator": "00:01:57,000",
-          "quote": "If your loan rate is meaningfully above what you expect from the market, the loan is a fine place for the extra five hundred.",
+          "locator": "00:02:00,000",
+          "quote": "the loan is a fine place for the extra five hundred",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 500.0,
@@ -1330,13 +1312,13 @@
         {
           "locator": "00:02:18,000",
           "quote": "Fifteen years of extra payments applied to the wrong bucket is a real thing that happens to real people.",
-          "claim_type": "other",
+          "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 15.0,
           "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
-          "detail": "claim_type=other is not checked against the facts table",
+          "detail": "claim_type=illustrative is not checked against the facts table",
           "current_value": null,
           "current_effective_from": null,
           "delta": null,
@@ -1586,7 +1568,7 @@
     }
   ],
   "counts": {
-    "skip": 73,
+    "skip": 72,
     "correct": 1,
     "stale_material": 7,
     "stale_immaterial": 0,
