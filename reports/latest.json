@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-13T14:49:17.321924Z",
+  "run_at": "2026-10-14T12:41:30.204790Z",
   "source": "youtube",
   "videos": [
     {
@@ -22,8 +22,8 @@
           "delta": -1.15,
           "source_url": "https://www.treasurydirect.gov/files/savings-bonds/i-bond-rate-chart.pdf",
           "fact_stale": false,
-          "note": "📌 Update: this video says 3.11%. The current figure is 4.26%, effective 2026-05-01.",
-          "note_source": "fallback"
+          "note": "4.26%*: Yes.\n        *   Year 2026: Yes.",
+          "note_source": "model"
         },
         {
           "locator": "00:00:18,000",
