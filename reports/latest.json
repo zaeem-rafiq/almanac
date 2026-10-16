@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-15T12:33:51.802485Z",
+  "run_at": "2026-10-16T12:09:57.388761Z",
   "source": "youtube",
   "videos": [
     {
@@ -1212,11 +1212,11 @@
           "rule_fired": "R5.stale_material",
           "detail": "video says 6.85, mortgage_30y_fixed is 7.4 (-0.55); moved 0.55pp, at or over the 0.50pp bar",
           "current_value": 7.4,
-          "current_effective_from": "2026-10-08",
+          "current_effective_from": "2026-10-15",
           "delta": -0.55,
           "source_url": "https://www.freddiemac.com/pmms",
           "fact_stale": false,
-          "note": "📌 Update: this video says 6.85%. The current figure is 7.40%, effective 2026-10-08.",
+          "note": "📌 Update: this video says 6.85%. The current figure is 7.40%, effective 2026-10-15.",
           "note_source": "fallback"
         },
         {
