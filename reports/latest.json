@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-16T12:09:57.388761Z",
+  "run_at": "2026-10-17T11:24:15.425674Z",
   "source": "youtube",
   "videos": [
     {
@@ -721,7 +721,7 @@
       "verdicts": [
         {
           "locator": "00:00:09,000",
-          "quote": "the three mistakes I see people make with it every single year.",
+          "quote": "and the three mistakes I see people make with it every single year.",
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 3.0,
@@ -775,7 +775,7 @@
         },
         {
           "locator": "00:00:30,000",
-          "quote": "the catch up is seven thousand five hundred dollars.",
+          "quote": "and the catch up is seven thousand five hundred dollars.",
           "claim_type": "statutory_limit",
           "entity_key": "k401_catchup_50plus",
           "claimed_value": 7500.0,
@@ -829,24 +829,6 @@
         },
         {
           "locator": "00:01:03,000",
-          "quote": "Okay, the three mistakes.",
-          "claim_type": "other",
-          "entity_key": null,
-          "claimed_value": 3.0,
-          "unit": null,
-          "status": "skip",
-          "rule_fired": "R2.unjudged_claim_type",
-          "detail": "claim_type=other is not checked against the facts table",
-          "current_value": null,
-          "current_effective_from": null,
-          "delta": null,
-          "source_url": null,
-          "fact_stale": false,
-          "note": null,
-          "note_source": null
-        },
-        {
-          "locator": "00:01:03,000",
           "quote": "Mistake one is stopping at the match.",
           "claim_type": "other",
           "entity_key": null,
@@ -883,7 +865,7 @@
         },
         {
           "locator": "00:01:09,000",
-          "quote": "your plan matches six percent of your salary.",
+          "quote": "and your plan matches six percent of your salary.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 6.0,
@@ -1044,8 +1026,8 @@
           "note_source": null
         },
         {
-          "locator": "00:02:03,000",
-          "quote": "to raise it one more.",
+          "locator": "00:02:00,000",
+          "quote": "Then set a calendar reminder for next January to raise it one more.",
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 1.0,
@@ -1081,7 +1063,7 @@
         },
         {
           "locator": "00:02:09,000",
-          "quote": "go from three percent",
+          "quote": "I have watched people go from three percent",
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 3.0,
@@ -1099,7 +1081,7 @@
         },
         {
           "locator": "00:02:12,000",
-          "quote": "to fifteen percent this way",
+          "quote": "to fifteen percent this way without ever once feeling poorer.",
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 15.0,
@@ -1135,7 +1117,7 @@
         }
       ],
       "counts": {
-        "skip": 19,
+        "skip": 18,
         "correct": 0,
         "stale_material": 2,
         "stale_immaterial": 0,
@@ -1356,8 +1338,8 @@
           "delta": -100.0,
           "source_url": "https://www.irs.gov/publications/p969",
           "fact_stale": false,
-          "note": "📌 Update: this video says $4,300. The current figure is $4,400, effective 2026-01-01.",
-          "note_source": "fallback"
+          "note": "is $4,400. -> 2026 is $4,400",
+          "note_source": "model"
         },
         {
           "locator": "00:00:21,000",
@@ -1550,7 +1532,7 @@
     }
   ],
   "counts": {
-    "skip": 71,
+    "skip": 70,
     "correct": 1,
     "stale_material": 7,
     "stale_immaterial": 0,
