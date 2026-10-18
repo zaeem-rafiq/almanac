@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-17T11:24:15.425674Z",
+  "run_at": "2026-10-18T11:58:13.784675Z",
   "source": "youtube",
   "videos": [
     {
@@ -45,7 +45,7 @@
         },
         {
           "locator": "00:00:21,000",
-          "quote": "and it resets on the first of May",
+          "quote": "it resets on the first of May",
           "claim_type": "structural",
           "entity_key": null,
           "claimed_value": 1.0,
@@ -171,7 +171,7 @@
         },
         {
           "locator": "00:01:51,000",
-          "quote": "The moment you put your emergency fund somewhere with a twelve month lockup",
+          "quote": "The moment you put your emergency fund somewhere with a twelve month lockup it is not an emergency fund anymore, it is just money you feel good about.",
           "claim_type": "structural",
           "entity_key": null,
           "claimed_value": 12.0,
@@ -1338,8 +1338,8 @@
           "delta": -100.0,
           "source_url": "https://www.irs.gov/publications/p969",
           "fact_stale": false,
-          "note": "is $4,400. -> 2026 is $4,400",
-          "note_source": "model"
+          "note": "📌 Update: this video says $4,300. The current figure is $4,400, effective 2026-01-01.",
+          "note_source": "fallback"
         },
         {
           "locator": "00:00:21,000",
