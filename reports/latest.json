@@ -1,5 +1,5 @@
 {
-  "run_at": "2026-10-18T11:58:13.784675Z",
+  "run_at": "2026-10-19T14:26:23.947640Z",
   "source": "youtube",
   "videos": [
     {
@@ -293,7 +293,7 @@
         },
         {
           "locator": "00:00:18,000",
-          "quote": "and this ten thousand is genuinely spare",
+          "quote": "and this ten thousand is genuinely spare.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 10000.0,
@@ -347,7 +347,7 @@
         },
         {
           "locator": "00:00:33,000",
-          "quote": "and one thousand is enough to cover the ordinary version of almost every emergency.",
+          "quote": "one thousand is enough to cover the ordinary version of almost every emergency.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 1000.0,
@@ -473,11 +473,11 @@
         },
         {
           "locator": "00:01:15,000",
-          "quote": "Say you go sixty forty",
+          "quote": "sixty percent stocks",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 60.0,
-          "unit": null,
+          "unit": "pct",
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
           "detail": "claim_type=illustrative is not checked against the facts table",
@@ -563,7 +563,7 @@
         },
         {
           "locator": "00:01:39,000",
-          "quote": "Over thirty years",
+          "quote": "Over thirty years, at that assumed rate",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 30.0,
@@ -581,7 +581,7 @@
         },
         {
           "locator": "00:01:42,000",
-          "quote": "doubles about three and a half times.",
+          "quote": "a lump sum roughly doubles about three and a half times.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 3.5,
@@ -690,13 +690,13 @@
         {
           "locator": "00:02:24,000",
           "quote": "waiting for a better entry point is how people spend four years in cash.",
-          "claim_type": "other",
+          "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 4.0,
           "unit": null,
           "status": "skip",
           "rule_fired": "R2.unjudged_claim_type",
-          "detail": "claim_type=other is not checked against the facts table",
+          "detail": "claim_type=illustrative is not checked against the facts table",
           "current_value": null,
           "current_effective_from": null,
           "delta": null,
@@ -721,7 +721,7 @@
       "verdicts": [
         {
           "locator": "00:00:09,000",
-          "quote": "and the three mistakes I see people make with it every single year.",
+          "quote": "the three mistakes I see people make with it every single year.",
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 3.0,
@@ -775,7 +775,7 @@
         },
         {
           "locator": "00:00:30,000",
-          "quote": "and the catch up is seven thousand five hundred dollars.",
+          "quote": "the catch up is seven thousand five hundred dollars.",
           "claim_type": "statutory_limit",
           "entity_key": "k401_catchup_50plus",
           "claimed_value": 7500.0,
@@ -829,6 +829,24 @@
         },
         {
           "locator": "00:01:03,000",
+          "quote": "Okay, the three mistakes.",
+          "claim_type": "other",
+          "entity_key": null,
+          "claimed_value": 3.0,
+          "unit": null,
+          "status": "skip",
+          "rule_fired": "R2.unjudged_claim_type",
+          "detail": "claim_type=other is not checked against the facts table",
+          "current_value": null,
+          "current_effective_from": null,
+          "delta": null,
+          "source_url": null,
+          "fact_stale": false,
+          "note": null,
+          "note_source": null
+        },
+        {
+          "locator": "00:01:03,000",
           "quote": "Mistake one is stopping at the match.",
           "claim_type": "other",
           "entity_key": null,
@@ -865,7 +883,7 @@
         },
         {
           "locator": "00:01:09,000",
-          "quote": "and your plan matches six percent of your salary.",
+          "quote": "your plan matches six percent of your salary.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 6.0,
@@ -1026,8 +1044,8 @@
           "note_source": null
         },
         {
-          "locator": "00:02:00,000",
-          "quote": "Then set a calendar reminder for next January to raise it one more.",
+          "locator": "00:02:03,000",
+          "quote": "to raise it one more.",
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 1.0,
@@ -1063,7 +1081,7 @@
         },
         {
           "locator": "00:02:09,000",
-          "quote": "I have watched people go from three percent",
+          "quote": "go from three percent",
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 3.0,
@@ -1081,7 +1099,7 @@
         },
         {
           "locator": "00:02:12,000",
-          "quote": "to fifteen percent this way without ever once feeling poorer.",
+          "quote": "to fifteen percent this way",
           "claim_type": "other",
           "entity_key": null,
           "claimed_value": 15.0,
@@ -1117,7 +1135,7 @@
         }
       ],
       "counts": {
-        "skip": 18,
+        "skip": 19,
         "correct": 0,
         "stale_material": 2,
         "stale_immaterial": 0,
@@ -1167,7 +1185,7 @@
         },
         {
           "locator": "00:00:18,000",
-          "quote": "you have found an extra five hundred dollars a month you could throw at either side",
+          "quote": "and you have found an extra five hundred dollars a month you could throw at either side",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 500.0,
@@ -1256,8 +1274,8 @@
           "note_source": null
         },
         {
-          "locator": "00:02:00,000",
-          "quote": "the loan is a fine place for the extra five hundred",
+          "locator": "00:01:57,000",
+          "quote": "If your loan rate is meaningfully above what you expect from the market, the loan is a fine place for the extra five hundred.",
           "claim_type": "illustrative",
           "entity_key": null,
           "claimed_value": 500.0,
@@ -1532,7 +1550,7 @@
     }
   ],
   "counts": {
-    "skip": 70,
+    "skip": 71,
     "correct": 1,
     "stale_material": 7,
     "stale_immaterial": 0,
